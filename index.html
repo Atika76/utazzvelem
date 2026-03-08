@@ -1,146 +1,106 @@
 <!DOCTYPE html>
 <html lang="hu">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UtazzVelem – Fuvarmegosztó weboldal</title>
-  <meta name="description" content="Keress fuvart vagy adj fel saját utat gyorsan és egyszerűen egy modern fuvarmegosztó oldalon." />
-  <meta name="robots" content="index,follow" />
-  <link rel="icon" type="image/svg+xml" href="assets/logo-utazzvelem.svg" />
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Utazz Velem – Fuvarmegosztó</title>
+
+<style>
+body{
+font-family:Arial,Helvetica,sans-serif;
+margin:0;
+background:#0f172a;
+color:white;
+}
+
+header{
+background:#020617;
+padding:20px;
+text-align:center;
+font-size:28px;
+font-weight:bold;
+}
+
+.hero{
+padding:80px 20px;
+text-align:center;
+}
+
+.hero h1{
+font-size:42px;
+margin-bottom:20px;
+}
+
+.btn{
+display:inline-block;
+background:#3b82f6;
+padding:15px 25px;
+border-radius:8px;
+text-decoration:none;
+color:white;
+font-size:18px;
+}
+
+.cards{
+display:flex;
+gap:20px;
+justify-content:center;
+padding:40px;
+flex-wrap:wrap;
+}
+
+.card{
+background:#1e293b;
+padding:25px;
+border-radius:10px;
+width:260px;
+}
+
+footer{
+text-align:center;
+padding:30px;
+background:#020617;
+margin-top:40px;
+}
+</style>
+
 </head>
 <body>
-  <header class="site-header">
-    <div class="container nav">
-      <a class="logo" href="index.html"><img src="assets/logo-utazzvelem.svg" alt="UtazzVelem logó" class="logo-icon" /><span>UtazzVelem</span></a>
-      <nav>
-        <a href="index.html">Főoldal</a>
-        <a href="fuvarok.html">Fuvarok</a>
-        <a href="fuvar-feladas.html">Fuvar feladása</a>
-        <a href="kapcsolat.html">Kapcsolat</a>
-        <a href="admin.html" class="nav-cta">Admin</a>
-      </nav>
-    </div>
-  </header>
 
-  <main>
-    <section class="hero">
-      <div class="container hero-grid">
-        <div>
-      
-          <h1>Találj gyorsan és egyszerűen fuvart vagy utast</h1>
-          <p class="lead">Adj fel saját fuvart, vagy keress szabad helyet mások autójában gyorsan és egyszerűen. A mostani verzió már kipróbálható, a beküldött adatok demó módban mentődnek.</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="fuvarok.html">Fuvarok keresése</a>
-            <a class="btn btn-secondary" href="fuvar-feladas.html">Fuvar feladása</a>
-          </div>
-        </div>
-        <div class="card hero-card">
-          <h2>Gyors kereső</h2>
-          <form id="quickSearchForm" class="grid-2 compact-form">
-            <label>
-              <span>Indulási hely</span>
-              <input type="text" id="quickOrigin" placeholder="pl. Budapest" />
-            </label>
-            <label>
-              <span>Érkezési hely</span>
-              <input type="text" id="quickDestination" placeholder="pl. Győr" />
-            </label>
-            <label>
-              <span>Dátum</span>
-              <input type="date" id="quickDate" />
-            </label>
-            <label>
-              <span>&nbsp;</span>
-              <button type="submit" class="btn btn-primary btn-full">Keresés</button>
-            </label>
-          </form>
-        </div>
-      </div>
-    </section>
+<header>
+Utazz Velem
+</header>
 
-    <section class="section">
-      <div class="container">
-        <div class="section-head">
-          <div>
-            <span class="eyebrow">Mi van benne?</span>
-            <h2>A kipróbálható verzió fő részei</h2>
-          </div>
-        </div>
-        <div class="cards-3">
-          <article class="card">
-            <h3>Fuvar keresés</h3>
-            <p>Indulási hely, érkezési hely és dátum szerint kereshető fuvarlista.</p>
-          </article>
-          <article class="card">
-            <h3>Fuvar feladás</h3>
-            <p>A tulajdonos és más hirdetők is feladhatnak fuvart kitölthető űrlapon keresztül.</p>
-          </article>
-          <article class="card">
-            <h3>Admin alap</h3>
-            <p>Egyszerű admin felület, ahol a demó fuvarok kezelhetők és az alapbeállítások módosíthatók.</p>
-          </article>
-        </div>
-      </div>
-    </section>
+<section class="hero">
+<h1>Találj fuvart vagy utast egyszerűen</h1>
+<p>Magyar fuvarmegosztó közösség.</p>
+<br>
+<a class="btn" href="#">Fuvar keresése</a>
+</section>
 
-    <section class="section alt">
-      <div class="container two-col">
-        <div>
-          <span class="eyebrow">Fontos</span>
-          <h2>Saját adatokkal könnyen testre szabható</h2>
-          <p>A beállítások oldalon pár kattintással átírhatod a weboldal nevét, elérhetőségeit és bemutatkozását.</p>
-          <ul class="checklist">
-            <li>weboldal neve</li>
-            <li>vállalkozás neve</li>
-            <li>kapcsolati e-mail</li>
-            <li>telefonszám</li>
-            <li>bemutatkozás</li>
-            <li>város / telephely</li>
-          </ul>
-        </div>
-        <div class="card settings-preview">
-          <h3>Beállítások mintája</h3>
-          <div class="settings-list">
-            <div><strong>Weboldal neve:</strong> <span data-setting="siteName">FuvarPortál</span></div>
-            <div><strong>Vállalkozás:</strong> <span data-setting="businessName">[kitöltendő]</span></div>
-            <div><strong>E-mail:</strong> <span data-setting="email">[kitöltendő]</span></div>
-            <div><strong>Telefonszám:</strong> <span data-setting="phone">[kitöltendő]</span></div>
-            <div><strong>Város:</strong> <span data-setting="city">[kitöltendő]</span></div>
-          </div>
-          <a class="btn btn-secondary btn-full" href="admin.html">Megnyitás admin oldalon</a>
-        </div>
-      </div>
-    </section>
+<section class="cards">
 
-    <section class="section">
-      <div class="container">
-        <div class="section-head">
-          <div>
-            <span class="eyebrow">Kiemelt példák</span>
-            <h2>Minta fuvarok</h2>
-          </div>
-          <a class="text-link" href="fuvarok.html">Összes fuvar megnyitása</a>
-        </div>
-        <div id="featuredTrips" class="cards-3"></div>
-      </div>
-    </section>
-  </main>
+<div class="card">
+<h3>Fuvar keresés</h3>
+<p>Keress autós utazást városok között.</p>
+</div>
 
-  <footer class="site-footer">
-    <div class="container footer-grid">
-      <div>
-        <strong>UtazzVelem</strong>
-        <p>Kipróbálható fuvarmegosztó weboldal. Tárhelyre feltölthető, később adatbázissal is bővíthető.</p>
-      </div>
-      <div>
-        <strong>Kapcsolat</strong>
-        <p>E-mail: <span data-setting="email">[kitöltendő]</span></p>
-        <p>Telefon: <span data-setting="phone">[kitöltendő]</span></p>
-      </div>
-    </div>
-  </footer>
+<div class="card">
+<h3>Fuvar feladás</h3>
+<p>Hirdess meg szabad helyet az autódban.</p>
+</div>
 
-  <script src="app.js"></script>
+<div class="card">
+<h3>Közösség</h3>
+<p>Utazz olcsóbban és ismerj meg új embereket.</p>
+</div>
+
+</section>
+
+<footer>
+© 2026 Utazz Velem
+</footer>
+
 </body>
 </html>
