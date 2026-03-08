@@ -3,15 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fuvar feladása – UtazzVelem</title>
-  <meta name="description" content="Adj fel új fuvart néhány adat megadásával, és próbáld ki a működést demó módban." />
-  <link rel="icon" type="image/svg+xml" href="assets/logo-utazzvelem.svg" />
+  <title>Fuvar feladása – FuvarPortál</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container nav">
-      <a class="logo" href="index.html"><img src="assets/logo-utazzvelem.svg" alt="UtazzVelem logó" class="logo-icon" /><span>UtazzVelem</span></a>
+      <a class="logo" href="index.html">FuvarPortál</a>
       <nav>
         <a href="index.html">Főoldal</a>
         <a href="fuvarok.html">Fuvarok</a>
@@ -28,7 +26,7 @@
         <div>
           <span class="eyebrow">Új hirdetés</span>
           <h1>Fuvar feladása</h1>
-          <p class="lead small">A beküldött fuvar most demó módban mentődik, így azonnal kipróbálhatod a működést tárhely nélkül is.</p>
+          <p class="lead small">A beküldött fuvar demó módban a böngésző helyi tárolójába mentődik. Később ezt Supabase adatbázisra lehet cserélni.</p>
         </div>
       </div>
 
@@ -89,8 +87,8 @@
           <label>
             <span>Állapot</span>
             <select name="status">
-              <option value="Jóváhagyva">Jóváhagyva</option>
               <option value="Függőben">Függőben</option>
+              <option value="Jóváhagyva">Jóváhagyva</option>
             </select>
           </label>
         </div>

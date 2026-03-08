@@ -85,6 +85,3 @@ textarea { resize: vertical; }
   .section-head { align-items: start; flex-direction: column; }
   .trip-actions { justify-content: start; }
 }
-.logo { display:flex; align-items:center; gap:10px; }
-.logo-icon { width:34px; height:34px; display:block; }
-.admin-actions-inline { display:flex; gap:12px; flex-wrap:wrap; }
