@@ -1,12 +1,12 @@
-const SETTINGS_KEY = 'fuvarportal_settings_v1';
-const TRIPS_KEY = 'fuvarportal_trips_v1';
+const SETTINGS_KEY = 'utazzvelem_settings_v2';
+const TRIPS_KEY = 'utazzvelem_trips_v2';
 
 const defaultSettings = {
-  siteName: 'FuvarPortál',
+  siteName: 'UtazzVelem',
   businessName: '[kitöltendő]',
   intro: '[kitöltendő]',
   email: '[kitöltendő]',
-  phone: '[kitöltendő]',
+  phone: '+36 30 123 4567',
   city: '[kitöltendő]',
   adminEmail: '[kitöltendő]'
 };
@@ -14,9 +14,9 @@ const defaultSettings = {
 const defaultTrips = [
   {
     id: cryptoRandom(),
-    driverName: 'Minta Fuvar 1',
-    contactEmail: '[kitöltendő]',
-    phone: '[kitöltendő]',
+    driverName: 'Kovács Péter',
+    contactEmail: 'minta@utazzvelem.hu',
+    phone: '+36 20 222 3344',
     packageType: 'Kiemelt',
     origin: 'Budapest',
     destination: 'Győr',
@@ -24,15 +24,15 @@ const defaultTrips = [
     time: '08:30',
     seats: 3,
     price: 4500,
-    note: 'Minta fuvar az induló verzióhoz.',
+    note: 'Kényelmes út, 1 közepes csomag elfér.',
     status: 'Jóváhagyva',
     createdAt: new Date().toISOString()
   },
   {
     id: cryptoRandom(),
-    driverName: 'Minta Fuvar 2',
-    contactEmail: '[kitöltendő]',
-    phone: '[kitöltendő]',
+    driverName: 'Nagy Anna',
+    contactEmail: 'minta2@utazzvelem.hu',
+    phone: '+36 70 555 6677',
     packageType: 'Alap',
     origin: 'Székesfehérvár',
     destination: 'Budapest',
@@ -46,8 +46,8 @@ const defaultTrips = [
   },
   {
     id: cryptoRandom(),
-    driverName: 'Minta Fuvar 3',
-    contactEmail: '[kitöltendő]',
+    driverName: 'Teszt Sofőr',
+    contactEmail: 'teszt@utazzvelem.hu',
     phone: '[kitöltendő]',
     packageType: 'Prémium',
     origin: 'Debrecen',
@@ -140,8 +140,8 @@ function applySettingsToPage() {
     const key = el.getAttribute('data-setting');
     if (settings[key] !== undefined) el.textContent = settings[key] || '[kitöltendő]';
   });
-  const titleLogo = document.querySelector('.logo');
-  if (titleLogo) titleLogo.textContent = settings.siteName || 'FuvarPortál';
+  const titleLogoText = document.querySelector('.logo span');
+  if (titleLogoText) titleLogoText.textContent = settings.siteName || 'UtazzVelem';
 }
 
 function initHome() {
@@ -225,8 +225,16 @@ function initTripForm() {
     trips.unshift(trip);
     saveTrips(trips);
     form.reset();
-    document.getElementById('tripFormMessage').textContent = 'A fuvar sikeresen elmentve a demó rendszerben.';
+    document.getElementById('tripFormMessage').textContent = 'A fuvar sikeresen elmentve. Menj az admin oldalra vagy a fuvarok listájára, és azonnal kipróbálhatod.';
   });
+}
+
+
+function resetDemoData() {
+  localStorage.removeItem(TRIPS_KEY);
+  localStorage.removeItem(SETTINGS_KEY);
+  loadTrips();
+  saveSettings(defaultSettings);
 }
 
 function initAdmin() {
@@ -245,6 +253,15 @@ function initAdmin() {
       saveSettings(newSettings);
       document.getElementById('settingsMessage').textContent = 'Beállítások elmentve.';
       applySettingsToPage();
+    });
+  }
+
+  const resetButton = document.getElementById('resetDemoData');
+  if (resetButton) {
+    resetButton.addEventListener('click', () => {
+      if (!confirm('Biztosan visszaállítod a demó adatokat?')) return;
+      resetDemoData();
+      location.reload();
     });
   }
 
