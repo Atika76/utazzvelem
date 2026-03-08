@@ -1,15 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="48" viewBox="0 0 220 48" fill="none">
+  <rect width="48" height="48" rx="14" fill="url(#g)"/>
+  <path d="M12 24h24" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <path d="M27 17l9 7-9 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="16" cy="31" r="3" fill="white"/>
+  <circle cx="32" cy="31" r="3" fill="white"/>
+  <text x="60" y="20" fill="#F5F8FF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Utazz</text>
+  <text x="60" y="38" fill="#7FB2FF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Velem</text>
   <defs>
-    <linearGradient id="g1" x1="20" y1="20" x2="220" y2="220" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#63A4FF"/>
-      <stop offset="1" stop-color="#2F80ED"/>
+    <linearGradient id="g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4E91FF"/>
+      <stop offset="1" stop-color="#0D1E52"/>
     </linearGradient>
   </defs>
-  <rect width="240" height="240" rx="56" fill="#0F172A"/>
-  <path d="M48 148c0-26.51 21.49-48 48-48h24c39.76 0 72 32.24 72 72v20H96c-26.51 0-48-21.49-48-48Z" fill="url(#g1)"/>
-  <path d="M84 88c0-22.09 17.91-40 40-40h22c25.41 0 46 20.59 46 46v22H124c-22.09 0-40-17.91-40-40Z" fill="#1E293B" stroke="#93C5FD" stroke-width="10"/>
-  <circle cx="160" cy="82" r="12" fill="#93C5FD"/>
-  <path d="M60 154h120" stroke="#E2E8F0" stroke-width="12" stroke-linecap="round"/>
-  <path d="M94 154l14-22" stroke="#E2E8F0" stroke-width="12" stroke-linecap="round"/>
-  <path d="M152 154l14-22" stroke="#E2E8F0" stroke-width="12" stroke-linecap="round"/>
 </svg>

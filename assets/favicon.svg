@@ -1,16 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="UtazzVelem logó">
-  <defs>
-    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#63a4ff"/>
-      <stop offset="100%" stop-color="#2f80ed"/>
-    </linearGradient>
-    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#b7d4ff"/>
-      <stop offset="100%" stop-color="#ffffff"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="18" fill="#0f1a2e"/>
-  <path d="M11 35c7-8 13-12 20-12 8 0 14 5 22 15" fill="none" stroke="url(#g1)" stroke-width="7" stroke-linecap="round"/>
-  <path d="M39 16l14 10-13 2z" fill="url(#g2)"/>
-  <circle cx="20" cy="42" r="4" fill="#63a4ff" opacity=".85"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="18" fill="#10224f"/>
+  <path d="M14 32h30" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <path d="M33 22l12 10-12 10" stroke="#7FB2FF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="20" cy="42" r="4" fill="#fff"/>
+  <circle cx="38" cy="42" r="4" fill="#fff"/>
 </svg>
