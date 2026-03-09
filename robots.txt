@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://atika76.github.io/utazzvelem/sitemap.xml
