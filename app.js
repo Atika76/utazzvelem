@@ -479,10 +479,29 @@ function initTripPreviewMap() {
   });
 }
 
-function initTripForm() {
+async function initTripForm() {
   const form = document.getElementById('tripForm');
   if (!form) return;
   initTripPreviewMap();
+
+  try {
+    const { data } = await supabaseClient.auth.getUser();
+    const user = data?.user;
+    if (user?.email) {
+      const emailInput = form.querySelector('input[name="contactEmail"]');
+      if (emailInput && !emailInput.value) {
+        emailInput.value = user.email;
+        emailInput.readOnly = true;
+      }
+      const nameInput = form.querySelector('input[name="driverName"]');
+      const metaName = user.user_metadata?.full_name || user.user_metadata?.name;
+      if (nameInput && metaName && !nameInput.value) {
+        nameInput.value = metaName;
+      }
+    }
+  } catch (error) {
+    console.warn('Felhasználói adatok előtöltése sikertelen:', error);
+  }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

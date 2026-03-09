@@ -68,6 +68,14 @@ async function requireAdminAccess() {
   return false;
 }
 
+async function requireAuthenticatedAccess() {
+  const state = await updateNavigationByAuth();
+  if (state.session) return true;
+  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  window.location.replace(`belepes.html?next=${encodeURIComponent(currentPage)}`);
+  return false;
+}
+
 async function getRedirectAfterLogin() {
   const params = new URLSearchParams(window.location.search);
   const next = params.get('next');
@@ -77,87 +85,21 @@ async function getRedirectAfterLogin() {
   if (next === 'admin') {
     return isAdminEmail(email) ? 'admin.html' : 'index.html?admin=denied';
   }
+
+  if (next && /\.html$/i.test(next)) {
+    return next;
+  }
+
   return 'index.html';
-}
-
-async function initAuthPage() {
-  const form = document.getElementById('authForm');
-  if (!form || !supabaseClient?.auth) return;
-  const modeInput = document.getElementById('authMode');
-  const switchBtn = document.getElementById('authModeSwitch');
-  const title = document.getElementById('authModeLabel');
-  const submit = document.getElementById('authSubmitBtn');
-  const message = document.getElementById('authMessage');
-
-  let mode = 'signin';
-  const existing = await getAuthSession();
-  if (existing) {
-    window.location.replace(await getRedirectAfterLogin());
-    return;
-  }
-
-  function renderMode() {
-    modeInput.value = mode;
-    if (mode === 'signin') {
-      title.textContent = 'Belépés';
-      submit.textContent = 'Belépés';
-      switchBtn.textContent = 'Még nincs fiókom, regisztrálok';
-    } else {
-      title.textContent = 'Regisztráció';
-      submit.textContent = 'Regisztráció';
-      switchBtn.textContent = 'Már van fiókom, belépek';
-    }
-    message.textContent = '';
-  }
-
-  switchBtn.addEventListener('click', () => {
-    mode = mode === 'signin' ? 'signup' : 'signin';
-    renderMode();
-  });
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const formData = new FormData(form);
-    const email = String(formData.get('email') || '').trim();
-    const password = String(formData.get('password') || '');
-    if (password.length < 6) {
-      message.textContent = 'A jelszó legalább 6 karakter legyen.';
-      return;
-    }
-
-    try {
-      if (mode === 'signup') {
-        const basePath = `${window.location.origin}${window.location.pathname.replace(/[^/]+$/, '')}`;
-        const { error } = await supabaseClient.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${basePath}belepes.html` }
-        });
-        if (error) throw error;
-        message.textContent = 'A regisztráció elkészült. Nyisd meg a megerősítő e-mailt, utána be tudsz lépni.';
-        mode = 'signin';
-        renderMode();
-        return;
-      }
-
-      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      window.location.replace(await getRedirectAfterLogin());
-    } catch (error) {
-      const safe = String(error?.message || 'Sikertelen művelet.');
-      if (safe.toLowerCase().includes('email not confirmed')) {
-        message.textContent = 'Az e-mail címet még meg kell erősíteni. Ellenőrizd a postafiókodat.';
-      } else {
-        message.textContent = safe;
-      }
-    }
-  });
-
-  renderMode();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
   await updateNavigationByAuth();
+
+  if (document.body.hasAttribute('data-require-auth')) {
+    const allowed = await requireAuthenticatedAccess();
+    if (!allowed) return;
+  }
 
   if (document.body.hasAttribute('data-require-admin')) {
     const allowed = await requireAdminAccess();
