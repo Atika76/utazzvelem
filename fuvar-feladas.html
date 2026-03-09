@@ -4,18 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fuvar feladása – Utazz Velem</title>
+  <meta name="description" content="Adj fel új fuvart néhány adat megadásával, egyszerűen és gyorsan." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container nav">
-      <a class="logo" href="index.html">Utazz Velem</a>
+      <a class="logo" href="index.html">
+        <img src="assets/logo-utazzvelem.svg" alt="Utazz Velem logó" />
+        <span data-setting="siteName">Utazz Velem</span>
+      </a>
       <nav>
         <a href="index.html">Főoldal</a>
         <a href="fuvarok.html">Fuvarok</a>
-        <a href="fuvar-feladas.html">Fuvar feladása</a>
+        <a href="fuvar-feladas.html" class="active">Fuvar feladása</a>
         <a href="kapcsolat.html">Kapcsolat</a>
-        <a href="admin-login.html" class="nav-cta admin-only" style="display:none;">Admin</a>
+        <a href="admin.html" class="nav-cta" data-admin-link hidden>Admin</a>
+        <a href="admin-login.html" class="nav-cta" data-admin-login-link>Admin belépés</a>
       </nav>
     </div>
   </header>
@@ -24,27 +30,27 @@
     <div class="container narrow">
       <div class="section-head">
         <div>
-          <span class="eyebrow">Új hirdetés</span>
+          <span class="eyebrow">Új fuvar</span>
           <h1>Fuvar feladása</h1>
-          <p class="lead small">Add meg az útvonalat, az indulás időpontját és a szabad helyeket. A beküldött fuvar admin jóváhagyás után jelenik meg.</p>
+          <p class="lead small">Add meg az útvonalat, az indulási időpontot és az elérhetőségeidet, hogy az érdeklődők könnyen megtaláljanak.</p>
         </div>
       </div>
 
-      <form id="tripForm" class="card form-stack">
+      <form id="tripForm" class="card form-stack glass-glow">
         <div class="grid-2">
           <label>
             <span>Név / cégnév</span>
-            <input name="driverName" type="text" placeholder="[kitöltendő]" required />
+            <input name="driverName" type="text" placeholder="pl. Kovács Péter" required />
           </label>
           <label>
             <span>Kapcsolati e-mail</span>
-            <input name="contactEmail" type="email" placeholder="[kitöltendő]" required />
+            <input name="contactEmail" type="email" placeholder="pl. info@pelda.hu" required />
           </label>
         </div>
         <div class="grid-2">
           <label>
             <span>Telefonszám</span>
-            <input name="phone" type="text" placeholder="[kitöltendő]" />
+            <input name="phone" type="text" placeholder="pl. +36 30 123 4567" />
           </label>
           <label>
             <span>Csomag típusa</span>
@@ -58,11 +64,11 @@
         <div class="grid-2">
           <label>
             <span>Indulási hely</span>
-            <input name="origin" type="text" required />
+            <input name="origin" type="text" placeholder="pl. Budapest" required />
           </label>
           <label>
             <span>Érkezési hely</span>
-            <input name="destination" type="text" required />
+            <input name="destination" type="text" placeholder="pl. Győr" required />
           </label>
         </div>
         <div class="grid-3">
@@ -84,7 +90,13 @@
             <span>Ár / fő (Ft)</span>
             <input name="price" type="number" min="0" step="100" placeholder="pl. 4500" required />
           </label>
-          
+          <label>
+            <span>Állapot</span>
+            <select name="status">
+              <option value="Jóváhagyva">Jóváhagyva</option>
+              <option value="Függőben">Függőben</option>
+            </select>
+          </label>
         </div>
         <label>
           <span>Megjegyzés</span>
@@ -100,6 +112,8 @@
     </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>

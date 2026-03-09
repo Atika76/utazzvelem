@@ -1,6 +1,8 @@
 const SETTINGS_KEY = 'utazzvelem_settings_v2';
 const TRIPS_KEY = 'utazzvelem_trips_v2';
-const ADMIN_SESSION_KEY = 'utazzvelem_admin_email';
+const SUPABASE_URL = 'https://qkppqjcazakocxgxtlzc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RnrWDmT0UUZdP-fIppVtgQ_vTw0N_2o';
+const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const defaultSettings = {
   siteName: 'Utazz Velem',
@@ -18,7 +20,7 @@ const defaultTrips = [
     driverName: 'Kovács Péter',
     contactEmail: 'peter.kovacs@pelda.hu',
     phone: '+36 30 456 7812',
-    packageType: 'Alap',
+    packageType: 'Kiemelt',
     origin: 'Budapest',
     destination: 'Győr',
     date: futureDate(1),
@@ -50,7 +52,7 @@ const defaultTrips = [
     driverName: 'Tóth Gábor',
     contactEmail: 'gabor.toth@pelda.hu',
     phone: '+36 70 333 9988',
-    packageType: 'Alap',
+    packageType: 'Prémium',
     origin: 'Debrecen',
     destination: 'Miskolc',
     date: futureDate(3),
@@ -58,7 +60,7 @@ const defaultTrips = [
     seats: 4,
     price: 3800,
     note: 'Előzetes telefonos egyeztetés javasolt.',
-    status: 'Függőben',
+    status: 'Jóváhagyva',
     createdAt: new Date().toISOString()
   }
 ];
@@ -66,63 +68,177 @@ const defaultTrips = [
 function cryptoRandom() {
   return 'id-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
+
 function futureDate(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
-function escapeHtml(str) {
-  return String(str)
+
+function escapeHtml(value) {
+  return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 }
-function loadSettings() {
-  const raw = localStorage.getItem(SETTINGS_KEY);
-  const data = raw ? JSON.parse(raw) : null;
-  return { ...defaultSettings, ...(data || {}) };
+
+function normalizeStatus(status) {
+  const safe = String(status || '').trim().toLowerCase();
+  if (safe === 'jóváhagyva' || safe === 'jovahagyva') return 'Jóváhagyva';
+  if (safe === 'törölve' || safe === 'torolve') return 'Törölve';
+  return 'Függőben';
 }
+
+function toDbStatus(status) {
+  return normalizeStatus(status).toLowerCase();
+}
+
+function mapDbTrip(row) {
+  return {
+    id: row.id,
+    driverName: row.nev || '',
+    contactEmail: row.email || '',
+    phone: row.telefon || '',
+    packageType: 'Alap',
+    origin: row.indulas || '',
+    destination: row.erkezes || '',
+    date: row.datum || '',
+    time: row.ido || '',
+    seats: Number(row.helyek || 0),
+    price: Number(row.ar || 0),
+    note: row.megjegyzes || '',
+    status: normalizeStatus(row.statusz),
+    createdAt: row.created_at || new Date().toISOString()
+  };
+}
+
+function toDbTrip(trip) {
+  return {
+    nev: trip.driverName,
+    email: trip.contactEmail,
+    telefon: trip.phone,
+    indulas: trip.origin,
+    erkezes: trip.destination,
+    datum: trip.date,
+    ido: trip.time,
+    helyek: trip.seats,
+    ar: trip.price,
+    megjegyzes: trip.note,
+    statusz: toDbStatus(trip.status)
+  };
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return { ...defaultSettings, ...(raw ? JSON.parse(raw) : {}) };
+  } catch {
+    return { ...defaultSettings };
+  }
+}
+
 function saveSettings(settings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
-function loadTrips() {
-  const raw = localStorage.getItem(TRIPS_KEY);
-  if (raw) return JSON.parse(raw);
+
+function loadTripsLocal() {
+  try {
+    const raw = localStorage.getItem(TRIPS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
   localStorage.setItem(TRIPS_KEY, JSON.stringify(defaultTrips));
-  return defaultTrips;
+  return [...defaultTrips];
 }
-function saveTrips(trips) {
+
+function saveTripsLocal(trips) {
   localStorage.setItem(TRIPS_KEY, JSON.stringify(trips));
 }
-function getAdminEmail() {
-  return (loadSettings().adminEmail || defaultSettings.adminEmail).trim().toLowerCase();
+
+async function ensureSeedTrips() {
+  if (!supabaseClient) return;
+  const { count, error } = await supabaseClient
+    .from('fuvarok')
+    .select('id', { count: 'exact', head: true });
+
+  if (error || count !== 0) return;
+
+  const seedTrips = defaultTrips.map((trip) => toDbTrip(trip));
+  await supabaseClient.from('fuvarok').insert(seedTrips);
 }
-function getAdminSessionEmail() {
-  return (sessionStorage.getItem(ADMIN_SESSION_KEY) || '').trim().toLowerCase();
+
+async function loadTrips() {
+  if (!supabaseClient) return loadTripsLocal();
+
+  try {
+    await ensureSeedTrips();
+    const { data, error } = await supabaseClient
+      .from('fuvarok')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    const trips = (data || []).map(mapDbTrip);
+    saveTripsLocal(trips);
+    return trips;
+  } catch (error) {
+    console.error('Supabase betöltési hiba:', error);
+    return loadTripsLocal();
+  }
 }
-function isAdminAuthenticated() {
-  return !!getAdminSessionEmail() && getAdminSessionEmail() === getAdminEmail();
+
+async function createTrip(trip) {
+  if (!supabaseClient) {
+    const trips = loadTripsLocal();
+    trips.unshift(trip);
+    saveTripsLocal(trips);
+    return trip;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('fuvarok')
+    .insert([toDbTrip(trip)])
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return mapDbTrip(data);
 }
-function setAdminSession(email) {
-  sessionStorage.setItem(ADMIN_SESSION_KEY, String(email || '').trim().toLowerCase());
+
+async function updateTripStatus(id, status) {
+  if (!supabaseClient) {
+    const updatedTrips = loadTripsLocal().map((trip) => {
+      if (String(trip.id) !== String(id)) return trip;
+      return { ...trip, status: normalizeStatus(status) };
+    });
+    saveTripsLocal(updatedTrips);
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('fuvarok')
+    .update({ statusz: toDbStatus(status) })
+    .eq('id', Number(id));
+
+  if (error) throw error;
 }
-function clearAdminSession() {
-  sessionStorage.removeItem(ADMIN_SESSION_KEY);
-}
+
 function statusClass(status) {
-  if (status === 'Jóváhagyva') return 'approved';
-  if (status === 'Törölve') return 'deleted';
+  const normalized = normalizeStatus(status);
+  if (normalized === 'Jóváhagyva') return 'approved';
+  if (normalized === 'Törölve') return 'deleted';
   return 'pending';
 }
+
 function tripCard(trip, isAdmin = false) {
+  const safeNote = trip.note ? `<p style="color:var(--muted);margin:10px 0 0;">${escapeHtml(trip.note)}</p>` : '';
   return `
-    <article class="card trip-card">
+    <article class="card trip-card glass-glow">
       <div>
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start;flex-wrap:wrap;">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap;">
           <div>
-            <h3 style="margin:0 0 8px;">${escapeHtml(trip.origin)} → ${escapeHtml(trip.destination)}</h3>
+            <h3>${escapeHtml(trip.origin)} → ${escapeHtml(trip.destination)}</h3>
             <div class="trip-meta">
               <span><strong>Dátum:</strong> ${escapeHtml(trip.date)}</span>
               <span><strong>Idő:</strong> ${escapeHtml(trip.time)}</span>
@@ -132,12 +248,12 @@ function tripCard(trip, isAdmin = false) {
           </div>
           <span class="status ${statusClass(trip.status)}">${escapeHtml(trip.status)}</span>
         </div>
-        <p style="color:var(--muted);margin:12px 0 0;"><strong>Sofőr / cég:</strong> ${escapeHtml(trip.driverName)} · <strong>Csomag:</strong> ${escapeHtml(trip.packageType)}</p>
-        <p style="color:var(--muted);margin:8px 0 0;">${escapeHtml(trip.note || '')}</p>
+        <p style="color:var(--muted);margin:12px 0 0;"><strong>Sofőr / cég:</strong> ${escapeHtml(trip.driverName)} · <strong>Csomag:</strong> ${escapeHtml(trip.packageType || 'Alap')}</p>
+        ${safeNote}
       </div>
       <div class="trip-meta">
         <span><strong>E-mail:</strong> ${escapeHtml(trip.contactEmail)}</span>
-        <span><strong>Telefon:</strong> ${escapeHtml(trip.phone || '[nincs megadva]')}</span>
+        <span><strong>Telefon:</strong> ${escapeHtml(trip.phone || 'Nincs megadva')}</span>
       </div>
       <div class="trip-actions">
         ${isAdmin ? `
@@ -148,71 +264,44 @@ function tripCard(trip, isAdmin = false) {
     </article>
   `;
 }
+
 function applySettingsToPage() {
   const settings = loadSettings();
-  document.querySelectorAll('[data-setting]').forEach(el => {
-    const key = el.getAttribute('data-setting');
-    if (settings[key] !== undefined) el.textContent = settings[key] || '';
-  });
-  document.querySelectorAll('.logo').forEach(el => el.textContent = settings.siteName || defaultSettings.siteName);
-  document.title = document.title.replace('FuvarPortál', settings.siteName || defaultSettings.siteName);
-}
-function updateAdminNavVisibility() {
-  document.querySelectorAll('.admin-only').forEach(el => {
-    el.style.display = isAdminAuthenticated() ? '' : 'none';
-  });
-}
-function requireAdminPageAccess() {
-  if (!document.getElementById('settingsForm')) return;
-  if (!isAdminAuthenticated()) {
-    window.location.href = 'admin-login.html';
-  }
-}
-function initAdminLogin() {
-  const form = document.getElementById('adminLoginForm');
-  if (!form) return;
-  if (isAdminAuthenticated()) {
-    window.location.href = 'admin.html';
-    return;
-  }
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const email = (new FormData(form).get('adminEmail') || '').toString().trim().toLowerCase();
-    const msg = document.getElementById('adminLoginMessage');
-    if (email === getAdminEmail()) {
-      setAdminSession(email);
-      msg.textContent = 'Sikeres belépés, átirányítás...';
-      window.location.href = 'admin.html';
-    } else {
-      msg.textContent = 'Ez az e-mail cím nem jogosult az admin felület megnyitására.';
+  document.title = document.title.replace(/Utazz Velem|FuvarPortál/g, settings.siteName || 'Utazz Velem');
+  document.querySelectorAll('[data-setting]').forEach((element) => {
+    const key = element.getAttribute('data-setting');
+    if (settings[key] !== undefined) {
+      element.textContent = settings[key];
     }
   });
+
+  const emailLink = document.querySelector('[data-email-link]');
+  if (emailLink) emailLink.setAttribute('href', `mailto:${settings.email}`);
 }
-function initLogout() {
-  const btn = document.getElementById('logoutBtn');
-  if (!btn) return;
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    clearAdminSession();
-    window.location.href = 'admin-login.html';
-  });
-}
-function initHome() {
+
+async function initHome() {
   const featured = document.getElementById('featuredTrips');
   if (featured) {
-    const trips = loadTrips().filter(t => t.status === 'Jóváhagyva').slice(0, 3);
+    const trips = (await loadTrips()).filter((trip) => trip.status === 'Jóváhagyva').slice(0, 3);
     featured.innerHTML = trips.length
-      ? trips.map(t => `<article class="card"><h3>${escapeHtml(t.origin)} → ${escapeHtml(t.destination)}</h3><p class="lead small">${escapeHtml(t.date)} · ${escapeHtml(t.time)} · ${escapeHtml(String(t.price))} Ft / fő</p><p>${escapeHtml(t.note)}</p></article>`).join('')
-      : `<div class="empty-state">Még nincs jóváhagyott fuvar.</div>`;
+      ? trips.map((trip) => `
+          <article class="card feature-card glass-glow">
+            <h3>${escapeHtml(trip.origin)} → ${escapeHtml(trip.destination)}</h3>
+            <p class="lead small">${escapeHtml(trip.date)} · ${escapeHtml(trip.time)} · ${escapeHtml(String(trip.price))} Ft / fő</p>
+            <p>${escapeHtml(trip.note)}</p>
+          </article>
+        `).join('')
+      : '<div class="empty-state">Jelenleg nincs elérhető fuvar.</div>';
   }
+
   const quickForm = document.getElementById('quickSearchForm');
   if (quickForm) {
-    quickForm.addEventListener('submit', (e) => {
-      e.preventDefault();
+    quickForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const params = new URLSearchParams();
       const origin = document.getElementById('quickOrigin').value.trim();
       const destination = document.getElementById('quickDestination').value.trim();
       const date = document.getElementById('quickDate').value;
-      const params = new URLSearchParams();
       if (origin) params.set('origin', origin);
       if (destination) params.set('destination', destination);
       if (date) params.set('date', date);
@@ -220,120 +309,172 @@ function initHome() {
     });
   }
 }
-function initTripsPage() {
+
+async function initTripsPage() {
   const list = document.getElementById('tripsList');
   if (!list) return;
+
   const params = new URLSearchParams(window.location.search);
   const originInput = document.getElementById('filterOrigin');
   const destinationInput = document.getElementById('filterDestination');
   const dateInput = document.getElementById('filterDate');
-  if (originInput) originInput.value = params.get('origin') || '';
-  if (destinationInput) destinationInput.value = params.get('destination') || '';
-  if (dateInput) dateInput.value = params.get('date') || '';
 
-  function render() {
+  originInput.value = params.get('origin') || '';
+  destinationInput.value = params.get('destination') || '';
+  dateInput.value = params.get('date') || '';
+
+  async function render() {
     const origin = originInput.value.trim().toLowerCase();
     const destination = destinationInput.value.trim().toLowerCase();
     const date = dateInput.value;
-    const trips = loadTrips().filter(t => t.status === 'Jóváhagyva').filter(t => {
-      const o = t.origin.toLowerCase().includes(origin);
-      const d = t.destination.toLowerCase().includes(destination);
-      const dt = !date || t.date === date;
-      return o && d && dt;
-    });
-    list.innerHTML = trips.length ? trips.map(t => tripCard(t)).join('') : `<div class="empty-state">Nincs a keresésnek megfelelő fuvar.</div>`;
+
+    const trips = (await loadTrips())
+      .filter((trip) => trip.status === 'Jóváhagyva')
+      .filter((trip) => {
+        const matchesOrigin = !origin || trip.origin.toLowerCase().includes(origin);
+        const matchesDestination = !destination || trip.destination.toLowerCase().includes(destination);
+        const matchesDate = !date || trip.date === date;
+        return matchesOrigin && matchesDestination && matchesDate;
+      });
+
+    list.innerHTML = trips.length
+      ? trips.map((trip) => tripCard(trip)).join('')
+      : '<div class="empty-state">Nincs a keresésnek megfelelő fuvar.</div>';
   }
-  render();
-  const form = document.getElementById('tripFilterForm');
-  if (form) form.addEventListener('submit', (e) => { e.preventDefault(); render(); });
+
+  await render();
+  document.getElementById('tripFilterForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await render();
+  });
 }
+
 function initTripForm() {
   const form = document.getElementById('tripForm');
   if (!form) return;
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const fd = new FormData(form);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const messageBox = document.getElementById('tripFormMessage');
+    messageBox.textContent = 'Mentés folyamatban...';
+
+    const formData = new FormData(form);
     const trip = {
       id: cryptoRandom(),
-      driverName: fd.get('driverName')?.toString().trim() || '',
-      contactEmail: fd.get('contactEmail')?.toString().trim() || '',
-      phone: fd.get('phone')?.toString().trim() || '',
-      packageType: fd.get('packageType')?.toString().trim() || 'Alap',
-      origin: fd.get('origin')?.toString().trim() || '',
-      destination: fd.get('destination')?.toString().trim() || '',
-      date: fd.get('date')?.toString() || '',
-      time: fd.get('time')?.toString() || '',
-      seats: Number(fd.get('seats') || 0),
-      price: Number(fd.get('price') || 0),
+      driverName: formData.get('driverName')?.toString().trim() || '',
+      contactEmail: formData.get('contactEmail')?.toString().trim() || '',
+      phone: formData.get('phone')?.toString().trim() || '',
+      packageType: formData.get('packageType')?.toString().trim() || 'Alap',
+      origin: formData.get('origin')?.toString().trim() || '',
+      destination: formData.get('destination')?.toString().trim() || '',
+      date: formData.get('date')?.toString() || '',
+      time: formData.get('time')?.toString() || '',
+      seats: Number(formData.get('seats') || 0),
+      price: Number(formData.get('price') || 0),
       status: 'Függőben',
-      note: fd.get('note')?.toString().trim() || '',
+      note: formData.get('note')?.toString().trim() || '',
       createdAt: new Date().toISOString()
     };
-    const trips = loadTrips();
-    trips.unshift(trip);
-    saveTrips(trips);
-    form.reset();
-    document.getElementById('tripFormMessage').textContent = 'A fuvar sikeresen beküldve. Admin jóváhagyás után jelenik meg az oldalon.';
+
+    try {
+      await createTrip(trip);
+      form.reset();
+      messageBox.textContent = 'A fuvar sikeresen rögzítve lett. Jóváhagyás után meg fog jelenni a listában.';
+    } catch (error) {
+      console.error('Mentési hiba:', error);
+      messageBox.textContent = 'Hiba történt a mentés során. Ellenőrizd a Supabase kapcsolatot.';
+    }
   });
 }
+
 function initAdmin() {
   const settingsForm = document.getElementById('settingsForm');
   if (settingsForm) {
     const settings = loadSettings();
-    Object.keys(settings).forEach(key => {
+    Object.keys(settings).forEach((key) => {
       const field = settingsForm.elements.namedItem(key);
       if (field) field.value = settings[key] || '';
     });
-    settingsForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const fd = new FormData(settingsForm);
+    const adminField = settingsForm.elements.namedItem('adminEmail');
+    if (adminField) {
+      adminField.value = ADMIN_EMAIL;
+      adminField.setAttribute('readonly', 'readonly');
+    }
+
+    settingsForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const formData = new FormData(settingsForm);
       const newSettings = { ...defaultSettings };
-      Object.keys(defaultSettings).forEach(key => newSettings[key] = fd.get(key)?.toString().trim() || defaultSettings[key]);
+      Object.keys(defaultSettings).forEach((key) => {
+        newSettings[key] = formData.get(key)?.toString().trim() || defaultSettings[key];
+      });
+      newSettings.adminEmail = ADMIN_EMAIL;
       saveSettings(newSettings);
-      if (getAdminSessionEmail() && getAdminSessionEmail() !== newSettings.adminEmail.trim().toLowerCase()) {
-        clearAdminSession();
-        document.getElementById('settingsMessage').textContent = 'Beállítások elmentve. Az admin e-mail megváltozott, jelentkezz be újra.';
-        setTimeout(() => window.location.href = 'admin-login.html', 900);
-        return;
-      }
-      document.getElementById('settingsMessage').textContent = 'Beállítások elmentve.';
+      document.getElementById('settingsMessage').textContent = 'A beállítások elmentve.';
       applySettingsToPage();
-      updateAdminNavVisibility();
     });
   }
+
   const list = document.getElementById('adminTripsList');
-  if (list) {
-    function render() {
-      const trips = loadTrips();
-      list.innerHTML = trips.length ? trips.map(t => tripCard(t, true)).join('') : `<div class="empty-state">Még nincs beküldött fuvar.</div>`;
-      list.querySelectorAll('button[data-action]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-id');
-          const action = btn.getAttribute('data-action');
-          const trips = loadTrips().map(t => {
-            if (t.id === id) {
-              if (action === 'approve') return { ...t, status: 'Jóváhagyva' };
-              if (action === 'delete') return { ...t, status: 'Törölve' };
-            }
-            return t;
-          });
-          saveTrips(trips);
-          render();
-        });
+  if (!list) return;
+
+  async function render() {
+    const trips = await loadTrips();
+    list.innerHTML = trips.length
+      ? trips.map((trip) => tripCard(trip, true)).join('')
+      : '<div class="empty-state">Jelenleg nincs beküldött fuvar.</div>';
+
+    list.querySelectorAll('button[data-action]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const id = button.getAttribute('data-id');
+        const action = button.getAttribute('data-action');
+        const status = action === 'approve' ? 'Jóváhagyva' : 'Törölve';
+        try {
+          await updateTripStatus(id, status);
+          await render();
+        } catch (error) {
+          console.error('Státuszfrissítési hiba:', error);
+          alert('Nem sikerült módosítani a fuvar állapotát.');
+        }
       });
-    }
-    render();
+    });
   }
+
+  render();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  requireAdminPageAccess();
+function initContactForm() {
+  const form = document.getElementById('contactForm');
+  if (!form) return;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const settings = loadSettings();
+    const formData = new FormData(form);
+    const name = formData.get('name')?.toString().trim() || '';
+    const email = formData.get('email')?.toString().trim() || '';
+    const message = formData.get('message')?.toString().trim() || '';
+    const subject = encodeURIComponent(`Üzenet az Utazz Velem oldalról – ${name}`);
+    const body = encodeURIComponent(`Név: ${name}\nE-mail: ${email}\n\nÜzenet:\n${message}`);
+    window.location.href = `mailto:${settings.email}?subject=${subject}&body=${body}`;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await updateAdminNavigation();
+
+  if (document.body.hasAttribute('data-require-admin')) {
+    const session = await requireAdminAuth();
+    if (!session) return;
+  }
+
+  if (document.body.hasAttribute('data-admin-login-page')) {
+    await initAdminLoginPage();
+  }
+
   applySettingsToPage();
-  updateAdminNavVisibility();
-  initAdminLogin();
-  initLogout();
-  initHome();
-  initTripsPage();
+  await initHome();
+  await initTripsPage();
   initTripForm();
   initAdmin();
+  initContactForm();
 });

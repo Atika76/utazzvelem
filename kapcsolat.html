@@ -4,49 +4,58 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kapcsolat – Utazz Velem</title>
+  <meta name="description" content="Kapcsolatfelvétel az Utazz Velem csapatával." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container nav">
-      <a class="logo" href="index.html">Utazz Velem</a>
+      <a class="logo" href="index.html">
+        <img src="assets/logo-utazzvelem.svg" alt="Utazz Velem logó" />
+        <span data-setting="siteName">Utazz Velem</span>
+      </a>
       <nav>
         <a href="index.html">Főoldal</a>
         <a href="fuvarok.html">Fuvarok</a>
         <a href="fuvar-feladas.html">Fuvar feladása</a>
-        <a href="kapcsolat.html">Kapcsolat</a>
-        <a href="admin-login.html" class="nav-cta admin-only" style="display:none;">Admin</a>
+        <a href="kapcsolat.html" class="active">Kapcsolat</a>
+        <a href="admin.html" class="nav-cta" data-admin-link hidden>Admin</a>
+        <a href="admin-login.html" class="nav-cta" data-admin-login-link>Admin belépés</a>
       </nav>
     </div>
   </header>
 
   <main class="section">
     <div class="container two-col">
-      <section class="card">
+      <section class="card glass-glow">
         <span class="eyebrow">Kapcsolat</span>
         <h1>Kapcsolati adatok</h1>
+        <p class="lead small">Kérdésed van, vagy szeretnél érdeklődni egy fuvarral kapcsolatban? Az alábbi elérhetőségeken tudod felvenni a kapcsolatot.</p>
         <div class="contact-list">
-          <p><strong>Vállalkozás:</strong> <span data-setting="businessName">[kitöltendő]</span></p>
-          <p><strong>E-mail:</strong> <span data-setting="email">[kitöltendő]</span></p>
-          <p><strong>Telefon:</strong> <span data-setting="phone">[kitöltendő]</span></p>
-          <p><strong>Város / telephely:</strong> <span data-setting="city">[kitöltendő]</span></p>
+          <p><strong>Szolgáltató:</strong> <span data-setting="businessName">Utazz Velem</span></p>
+          <p><strong>E-mail:</strong> <a href="#" data-email-link><span data-setting="email">info@utazzvelem.hu</span></a></p>
+          <p><strong>Telefon:</strong> <span data-setting="phone">+36 30 123 4567</span></p>
+          <p><strong>Város / telephely:</strong> <span data-setting="city">Budapest</span></p>
         </div>
       </section>
 
-      <section class="card">
-        <span class="eyebrow">Mintaszöveg</span>
-        <h2>Kapcsolatfelvétel</h2>
-        <p class="lead small">Vedd fel velünk a kapcsolatot kérdés, együttműködés vagy fuvarral kapcsolatos egyeztetés esetén.</p>
-        <form class="form-stack" onsubmit="event.preventDefault(); alert('Köszönjük! Az üzenetküldés funkció rövidesen elérhető lesz.');">
-          <label><span>Név</span><input type="text" placeholder="Név" /></label>
-          <label><span>E-mail</span><input type="email" placeholder="Email" /></label>
-          <label><span>Üzenet</span><textarea rows="5" placeholder="Üzenet"></textarea></label>
+      <section class="card glass-glow">
+        <span class="eyebrow">Üzenetküldés</span>
+        <h2>Írj nekünk</h2>
+        <p class="lead small">Az üzenet gomb megnyomásával az alapértelmezett levelezőprogramod nyílik meg az előre kitöltött adatokkal.</p>
+        <form id="contactForm" class="form-stack">
+          <label><span>Név</span><input type="text" name="name" placeholder="Név" required /></label>
+          <label><span>E-mail</span><input type="email" name="email" placeholder="E-mail" required /></label>
+          <label><span>Üzenet</span><textarea rows="5" name="message" placeholder="Üzenet" required></textarea></label>
           <button type="submit" class="btn btn-primary">Üzenet küldése</button>
         </form>
       </section>
     </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>

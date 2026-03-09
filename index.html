@@ -3,19 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Utazz Velem – Fuvarmegosztó weboldal</title>
+  <title>Utazz Velem – Kényelmes fuvarok országszerte</title>
+  <meta name="description" content="Utazz Velem – fuvarok keresése és feladása egyszerűen, gyorsan, átlátható felületen." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container nav">
-      <a class="logo" href="index.html">Utazz Velem</a>
+      <a class="logo" href="index.html">
+        <img src="assets/logo-utazzvelem.svg" alt="Utazz Velem logó" />
+        <span data-setting="siteName">Utazz Velem</span>
+      </a>
       <nav>
-        <a href="index.html">Főoldal</a>
+        <a href="index.html" class="active">Főoldal</a>
         <a href="fuvarok.html">Fuvarok</a>
         <a href="fuvar-feladas.html">Fuvar feladása</a>
         <a href="kapcsolat.html">Kapcsolat</a>
-        <a href="admin-login.html" class="nav-cta admin-only" style="display:none;">Admin</a>
+        <a href="admin.html" class="nav-cta" data-admin-link hidden>Admin</a>
+        <a href="admin-login.html" class="nav-cta" data-admin-login-link>Admin belépés</a>
       </nav>
     </div>
   </header>
@@ -23,17 +29,34 @@
   <main>
     <section class="hero">
       <div class="container hero-grid">
-        <div>
-      
-          <h1>Fuvarmegosztó weboldal, Találj gyorsan és egyszerűen fuvart vagy utast</h1>
-          <p class="lead">Gyors és átlátható fuvarmegosztó felület utasoknak és sofőröknek. Böngéssz a fuvarok között, vagy add fel saját utadat néhány perc alatt.</p>
+        <div class="hero-copy">
+          <span class="eyebrow">Országos fuvarmegosztás</span>
+          <h1>Találj fuvart gyorsan, egyszerűen és átláthatóan</h1>
+          <p class="lead">Az Utazz Velem azoknak készült, akik kényelmesen szeretnének utast vagy sofőrt találni. Böngéssz az elérhető fuvarok között, vagy add fel saját utadat néhány kattintással.</p>
           <div class="hero-actions">
             <a class="btn btn-primary" href="fuvarok.html">Fuvarok keresése</a>
             <a class="btn btn-secondary" href="fuvar-feladas.html">Fuvar feladása</a>
           </div>
+
+          <div class="hero-stats">
+            <div class="stat-card">
+              <strong>Gyors keresés</strong>
+              <span>Indulás, érkezés és dátum alapján</span>
+            </div>
+            <div class="stat-card">
+              <strong>Átlátható ajánlatok</strong>
+              <span>Ár, szabad hely és megjegyzések egy helyen</span>
+            </div>
+            <div class="stat-card">
+              <strong>Egyszerű kapcsolat</strong>
+              <span>Közvetlen elérhetőségek a fuvaroknál</span>
+            </div>
+          </div>
         </div>
-        <div class="card hero-card">
+
+        <div class="card hero-card glass-glow">
           <h2>Gyors kereső</h2>
+          <p class="muted">Írd be az útvonalat, és nézd meg az elérhető fuvarokat.</p>
           <form id="quickSearchForm" class="grid-2 compact-form">
             <label>
               <span>Indulási hely</span>
@@ -60,22 +83,22 @@
       <div class="container">
         <div class="section-head">
           <div>
-            <span class="eyebrow">Mi van benne?</span>
-            <h2>Az első verzió fő részei</h2>
+            <span class="eyebrow">Miért jó választás?</span>
+            <h2>Egyszerű használat, tiszta felület</h2>
           </div>
         </div>
         <div class="cards-3">
-          <article class="card">
-            <h3>Fuvar keresés</h3>
-            <p>Indulási hely, érkezési hely és dátum szerint kereshető fuvarlista.</p>
+          <article class="card feature-card">
+            <h3>Gyors keresés</h3>
+            <p>Szűrj indulási hely, érkezési hely és dátum alapján, hogy néhány másodperc alatt megtaláld a megfelelő fuvart.</p>
           </article>
-          <article class="card">
-            <h3>Fuvar feladás</h3>
-            <p>A tulajdonos és más hirdetők is feladhatnak fuvart kitölthető űrlapon keresztül.</p>
+          <article class="card feature-card">
+            <h3>Egyszerű fuvarfeladás</h3>
+            <p>Add meg az útvonalat, az időpontot, a szabad helyeket és az árat, így az érdeklődők rögtön látják a legfontosabb információkat.</p>
           </article>
-          <article class="card">
-            <h3>Admin felület</h3>
-            <p>A beküldött fuvarok jóváhagyása, törlése és az oldal alapadatainak kezelése egy helyen.</p>
+          <article class="card feature-card">
+            <h3>Átlátható kapcsolattartás</h3>
+            <p>Minden fuvarnál megjelenik az elérhetőség, így a kapcsolatfelvétel gyorsabb és kényelmesebb lehet.</p>
           </article>
         </div>
       </div>
@@ -84,28 +107,25 @@
     <section class="section alt">
       <div class="container two-col">
         <div>
-          <span class="eyebrow">Fontos</span>
-          <h2>Egyszerű, gyors, átlátható</h2>
-          <p>Az oldal könnyen használható, mobilbarát és egyszerűen kezelhető utasoknak és sofőröknek is.</p>
+          <span class="eyebrow">Megbízható megjelenés</span>
+          <h2>Olyan felület, amit jó használni mobilon is</h2>
+          <p class="lead small">Az oldal letisztult, mobilbarát kialakítást kapott, így telefonon és asztali gépen is jól áttekinthető.</p>
           <ul class="checklist">
-            <li>gyors fuvar keresés</li>
-            <li>egyszerű fuvarfeladás</li>
-            <li>admin jóváhagyás</li>
-            <li>átlátható kapcsolatfelvétel</li>
-            <li>mobilbarát megjelenés</li>
-            <li>könnyen kezelhető admin felület</li>
+            <li>könnyen olvasható fuvarlista</li>
+            <li>áttekinthető adatlapok</li>
+            <li>egyszerű kapcsolatfelvétel</li>
+            <li>gyors navigáció minden oldalon</li>
           </ul>
         </div>
         <div class="card settings-preview">
-          <h3>Elérhetőségek</h3>
+          <h3>Kapcsolati adatok</h3>
           <div class="settings-list">
-            <div><strong>Weboldal neve:</strong> <span data-setting="siteName">Utazz Velem</span></div>
-            <div><strong>Vállalkozás:</strong> <span data-setting="businessName">[kitöltendő]</span></div>
-            <div><strong>E-mail:</strong> <span data-setting="email">[kitöltendő]</span></div>
-            <div><strong>Telefonszám:</strong> <span data-setting="phone">[kitöltendő]</span></div>
-            <div><strong>Város:</strong> <span data-setting="city">[kitöltendő]</span></div>
+            <div><strong>Szolgáltató:</strong> <span data-setting="businessName">Utazz Velem</span></div>
+            <div><strong>E-mail:</strong> <span data-setting="email">info@utazzvelem.hu</span></div>
+            <div><strong>Telefon:</strong> <span data-setting="phone">+36 30 123 4567</span></div>
+            <div><strong>Város:</strong> <span data-setting="city">Budapest</span></div>
           </div>
-          <a class="btn btn-secondary btn-full" href="admin-login.html">Admin belépés</a>
+          <a class="btn btn-secondary btn-full" href="kapcsolat.html">Kapcsolat megnyitása</a>
         </div>
       </div>
     </section>
@@ -114,8 +134,8 @@
       <div class="container">
         <div class="section-head">
           <div>
-            <span class="eyebrow">Kiemelt példák</span>
-            <h2>Minta fuvarok</h2>
+            <span class="eyebrow">Friss ajánlatok</span>
+            <h2>Kiemelt fuvarok</h2>
           </div>
           <a class="text-link" href="fuvarok.html">Összes fuvar megnyitása</a>
         </div>
@@ -127,17 +147,19 @@
   <footer class="site-footer">
     <div class="container footer-grid">
       <div>
-        <strong>Utazz Velem</strong>
-        <p>Utazz Velem – gyors és átlátható fuvarmegosztó felület utasoknak és sofőröknek.</p>
+        <strong data-setting="siteName">Utazz Velem</strong>
+        <p>Gyors és átlátható fuvarmegosztó felület utasoknak és sofőröknek.</p>
       </div>
       <div>
         <strong>Kapcsolat</strong>
-        <p>E-mail: <span data-setting="email">[kitöltendő]</span></p>
-        <p>Telefon: <span data-setting="phone">[kitöltendő]</span></p>
+        <p>E-mail: <span data-setting="email">info@utazzvelem.hu</span></p>
+        <p>Telefon: <span data-setting="phone">+36 30 123 4567</span></p>
       </div>
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>
