@@ -1,162 +1,144 @@
-// ===============================
-// SUPABASE AUTH RENDSZER
-// ===============================
+window.AppAuth = (() => {
+  let cachedAdminEmail = null;
 
-const sb = window.supabaseClient;
-
-// -------------------------------
-// MENÜ FRISSÍTÉSE
-// -------------------------------
-
-async function updateMenu() {
-
-  const { data } = await sb.auth.getSession();
-  const session = data.session;
-
-  const guestEls = document.querySelectorAll('[data-auth="guest"]');
-  const userEls = document.querySelectorAll('[data-auth="user"]');
-  const adminEls = document.querySelectorAll('[data-auth="admin"]');
-
-  if (!session) {
-
-    // nincs belépve
-    guestEls.forEach(el => el.style.display = "");
-    userEls.forEach(el => el.style.display = "none");
-    adminEls.forEach(el => el.style.display = "none");
-
-    return;
+  function setNext(url) {
+    try { sessionStorage.setItem('uv_next', url || 'index.html'); } catch(_) {}
+  }
+  function consumeNext(fallback='index.html') {
+    try {
+      const v = sessionStorage.getItem('uv_next');
+      sessionStorage.removeItem('uv_next');
+      return v || fallback;
+    } catch(_) { return fallback; }
   }
 
-  // be van lépve
-  guestEls.forEach(el => el.style.display = "none");
-  userEls.forEach(el => el.style.display = "");
-
-  const email = session.user.email;
-
-  // admin email lekérése
-  const { data: settings } = await sb
-    .from("beallitasok")
-    .select("admin_email")
-    .limit(1)
-    .single();
-
-  const adminEmail = settings?.admin_email;
-
-  if (email === adminEmail) {
-
-    adminEls.forEach(el => el.style.display = "");
-
-  } else {
-
-    adminEls.forEach(el => el.style.display = "none");
-
+  async function getSession() {
+    const { data } = await sb.auth.getSession();
+    return data.session;
   }
 
-}
-
-// -------------------------------
-// KILÉPÉS
-// -------------------------------
-
-async function logout() {
-
-  try {
-    await sb.auth.signOut();
-  } catch (err) {
-    console.error("Kilépési hiba:", err);
+  async function getUser() {
+    const { data } = await sb.auth.getUser();
+    return data.user;
   }
 
-  try {
-    sessionStorage.removeItem("nextAfterLogin");
-  } catch (_) {}
+  async function fetchAdminEmail(force=false) {
+    if (cachedAdminEmail && !force) return cachedAdminEmail;
+    try {
+      const { data } = await sb.from('beallitasok').select('id,admin_email').order('id', { ascending: true }).limit(1).maybeSingle();
+      cachedAdminEmail = data?.admin_email || APP_CONFIG.adminEmail;
+    } catch (_) {
+      cachedAdminEmail = APP_CONFIG.adminEmail;
+    }
+    return cachedAdminEmail;
+  }
 
-  // menü frissítése
-  updateMenu();
+  async function isAdmin(email) {
+    const adminEmail = await fetchAdminEmail();
+    const target = email || (await getUser())?.email;
+    return !!target && String(target).toLowerCase() === String(adminEmail).toLowerCase();
+  }
 
-  // vissza a főoldalra
-  window.location.href = "index.html";
-}
+  async function updateNav() {
+    const session = await getSession();
+    const user = session?.user || null;
+    const admin = await isAdmin(user?.email);
 
-
-// -------------------------------
-// KILÉPÉS GOMB
-// -------------------------------
-
-function bindLogout() {
-
-  document.querySelectorAll("[data-logout]").forEach(btn => {
-
-    btn.addEventListener("click", async (e) => {
-
-      e.preventDefault();
-
-      await logout();
-
+    document.querySelectorAll('[data-auth="guest"]').forEach(el => {
+      el.classList.toggle('hidden', !!user);
     });
-
-  });
-
-}
-
-
-// -------------------------------
-// ADMIN OLDAL VÉDELEM
-// -------------------------------
-
-async function requireAdmin() {
-
-  const { data } = await sb.auth.getSession();
-  const session = data.session;
-
-  if (!session) {
-
-    window.location.href = "belepes.html";
-    return;
-
+    document.querySelectorAll('[data-auth="user"]').forEach(el => {
+      el.classList.toggle('hidden', !user);
+    });
+    document.querySelectorAll('[data-auth="admin"]').forEach(el => {
+      el.classList.toggle('hidden', !admin);
+    });
+    document.querySelectorAll('[data-user-email]').forEach(el => {
+      el.textContent = user?.email || '';
+    });
+    return { session, user, admin };
   }
 
-  const email = session.user.email;
-
-  const { data: settings } = await sb
-    .from("beallitasok")
-    .select("admin_email")
-    .limit(1)
-    .single();
-
-  const adminEmail = settings?.admin_email;
-
-  if (email !== adminEmail) {
-
-    window.location.href = "index.html";
-
+  async function signIn(email, password) {
+    return sb.auth.signInWithPassword({ email, password });
   }
 
-}
+  async function signUp(email, password, name='') {
+    return sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+        emailRedirectTo: APP_CONFIG.siteUrl + 'belepes.html'
+      }
+    });
+  }
 
+  async function signInWithFacebook() {
+    return sb.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: { redirectTo: APP_CONFIG.siteUrl + 'belepes.html' }
+    });
+  }
 
-// -------------------------------
-// AUTH FIGYELÉS
-// -------------------------------
+  async function logout() {
+    await sb.auth.signOut();
+    try { sessionStorage.removeItem('uv_next'); } catch(_) {}
+    location.href = 'index.html';
+  }
 
-function watchAuth() {
+  async function requireAuth(next='index.html') {
+    const session = await getSession();
+    if (session?.user) return true;
+    setNext(next || location.pathname.split('/').pop() || 'index.html');
+    location.href = 'belepes.html';
+    return false;
+  }
 
-  sb.auth.onAuthStateChange(() => {
+  async function requireAdmin() {
+    const session = await getSession();
+    if (!session?.user) {
+      setNext('admin.html');
+      location.href = 'belepes.html';
+      return false;
+    }
+    if (!await isAdmin(session.user.email)) {
+      location.href = 'index.html';
+      return false;
+    }
+    return true;
+  }
 
-    updateMenu();
+  function bindLogout() {
+    document.querySelectorAll('[data-logout]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await logout();
+      });
+    });
+  }
 
-  });
+  function watchAuth() {
+    sb.auth.onAuthStateChange(async () => {
+      await updateNav();
+    });
+  }
 
-}
-
-
-// -------------------------------
-// INDÍTÁS
-// -------------------------------
-
-document.addEventListener("DOMContentLoaded", () => {
-
-  updateMenu();
-  bindLogout();
-  watchAuth();
-
-});
+  return {
+    getSession,
+    getUser,
+    updateNav,
+    signIn,
+    signUp,
+    signInWithFacebook,
+    logout,
+    requireAuth,
+    requireAdmin,
+    isAdmin,
+    fetchAdminEmail,
+    bindLogout,
+    watchAuth,
+    setNext,
+    consumeNext
+  };
+})();
