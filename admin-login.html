@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin belépés – Utazz Velem</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav">
+      <a class="logo" href="index.html">Utazz Velem</a>
+      <nav>
+        <a href="index.html">Főoldal</a>
+        <a href="fuvarok.html">Fuvarok</a>
+        <a href="fuvar-feladas.html">Fuvar feladása</a>
+        <a href="kapcsolat.html">Kapcsolat</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="section">
+    <div class="container narrow">
+      <section class="card admin-login-card">
+        <span class="eyebrow">Admin belépés</span>
+        <h1>Belépés az admin felületre</h1>
+        <p class="lead small">Az admin felület csak a beállított admin e-mail címmel érhető el.</p>
+        <form id="adminLoginForm" class="form-stack">
+          <label>
+            <span>Admin e-mail cím</span>
+            <input name="adminEmail" type="email" placeholder="cegweb26@gmail.com" required />
+          </label>
+          <button type="submit" class="btn btn-primary">Belépés</button>
+          <p id="adminLoginMessage" class="form-message"></p>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

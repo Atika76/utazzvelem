@@ -4,51 +4,46 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin – Utazz Velem</title>
-  <meta name="robots" content="noindex,nofollow" />
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container nav">
-      <a class="logo" href="index.html">
-        <img src="assets/logo-utazzvelem.svg" alt="Utazz Velem logó" />
-        <span data-setting="siteName">Utazz Velem</span>
-      </a>
+      <a class="logo" href="index.html">Utazz Velem</a>
       <nav>
         <a href="index.html">Főoldal</a>
         <a href="fuvarok.html">Fuvarok</a>
         <a href="fuvar-feladas.html">Fuvar feladása</a>
         <a href="kapcsolat.html">Kapcsolat</a>
-        <a href="admin.html" class="nav-cta active">Admin</a>
+        <a href="#" id="logoutBtn" class="nav-cta">Kilépés</a>
       </nav>
     </div>
   </header>
 
   <main class="section">
     <div class="container admin-grid">
-      <section class="card glass-glow">
+      <section class="card">
         <span class="eyebrow">Beállítások</span>
         <h1>Weboldal adatai</h1>
-        <p class="lead small">Itt tudod módosítani a névjegyadatokat és az oldalon megjelenő alapinformációkat.</p>
+        <p class="lead small">Itt tudod módosítani a megjelenő adatokat és az oldal admin e-mail címét.</p>
         <form id="settingsForm" class="form-stack">
           <label><span>Weboldal neve</span><input name="siteName" type="text" placeholder="Utazz Velem" /></label>
-          <label><span>Vállalkozás neve</span><input name="businessName" type="text" placeholder="Utazz Velem" /></label>
-          <label><span>Bemutatkozás</span><textarea name="intro" rows="4" placeholder="Rövid bemutatkozás"></textarea></label>
+          <label><span>Vállalkozás neve</span><input name="businessName" type="text" placeholder="[kitöltendő]" /></label>
+          <label><span>Bemutatkozás</span><textarea name="intro" rows="4" placeholder="[kitöltendő]"></textarea></label>
           <div class="grid-2">
-            <label><span>E-mail cím</span><input name="email" type="email" placeholder="info@utazzvelem.hu" /></label>
-            <label><span>Telefonszám</span><input name="phone" type="text" placeholder="+36 30 123 4567" /></label>
+            <label><span>E-mail cím</span><input name="email" type="email" placeholder="[kitöltendő]" /></label>
+            <label><span>Telefonszám</span><input name="phone" type="text" placeholder="[kitöltendő]" /></label>
           </div>
           <div class="grid-2">
-            <label><span>Város / telephely</span><input name="city" type="text" placeholder="Budapest" /></label>
-            <label><span>Admin e-mail</span><input name="adminEmail" type="email" placeholder="admin@utazzvelem.hu" /></label>
+            <label><span>Város / telephely</span><input name="city" type="text" placeholder="[kitöltendő]" /></label>
+            <label><span>Admin e-mail</span><input name="adminEmail" type="email" placeholder="[kitöltendő]" /></label>
           </div>
           <button type="submit" class="btn btn-primary">Beállítások mentése</button>
           <p id="settingsMessage" class="form-message"></p>
         </form>
       </section>
 
-      <section class="card glass-glow">
+      <section class="card">
         <span class="eyebrow">Hirdetések</span>
         <h2>Beküldött fuvarok</h2>
         <p class="lead small">Az itt megjelenő fuvarokat át tudod nézni, jóvá tudod hagyni vagy törölni.</p>
@@ -57,7 +52,6 @@
     </div>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>

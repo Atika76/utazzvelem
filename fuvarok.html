@@ -4,23 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fuvarok – Utazz Velem</title>
-  <meta name="description" content="Böngészd az elérhető fuvarokat indulási hely, érkezési hely és dátum szerint." />
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container nav">
-      <a class="logo" href="index.html">
-        <img src="assets/logo-utazzvelem.svg" alt="Utazz Velem logó" />
-        <span data-setting="siteName">Utazz Velem</span>
-      </a>
+      <a class="logo" href="index.html">Utazz Velem</a>
       <nav>
         <a href="index.html">Főoldal</a>
-        <a href="fuvarok.html" class="active">Fuvarok</a>
+        <a href="fuvarok.html">Fuvarok</a>
         <a href="fuvar-feladas.html">Fuvar feladása</a>
         <a href="kapcsolat.html">Kapcsolat</a>
-        <a href="admin.html" class="nav-cta">Admin</a>
+        <a href="admin-login.html" class="nav-cta admin-only" style="display:none;">Admin</a>
       </nav>
     </div>
   </header>
@@ -31,11 +26,10 @@
         <div>
           <span class="eyebrow">Keresés</span>
           <h1>Elérhető fuvarok</h1>
-          <p class="lead small">Szűrj útvonal és dátum alapján, majd vedd fel a kapcsolatot a hirdetővel.</p>
         </div>
       </div>
 
-      <form id="tripFilterForm" class="card filter-bar grid-4 glass-glow">
+      <form id="tripFilterForm" class="card filter-bar grid-4">
         <label>
           <span>Indulási hely</span>
           <input type="text" id="filterOrigin" placeholder="pl. Budapest" />
@@ -58,18 +52,6 @@
     </div>
   </main>
 
-  <footer class="site-footer compact-footer">
-    <div class="container footer-grid">
-      <div>
-        <strong data-setting="siteName">Utazz Velem</strong>
-      </div>
-      <div>
-        <p>E-mail: <span data-setting="email">info@utazzvelem.hu</span></p>
-      </div>
-    </div>
-  </footer>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>
