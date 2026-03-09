@@ -1,4 +1,4 @@
-const ADMIN_EMAIL = "cegweb26@gmail.com";
+const DEFAULT_ADMIN_EMAIL = "cegweb26@gmail.com";
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -14,8 +14,22 @@ async function getAuthSession() {
   return data.session || null;
 }
 
+
+function getStoredSettings() {
+  try {
+    return JSON.parse(localStorage.getItem('utazzvelem_settings_v2') || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function getConfiguredAdminEmail() {
+  const settings = getStoredSettings();
+  return normalizeEmail(settings.adminEmail || DEFAULT_ADMIN_EMAIL);
+}
+
 function isAdminEmail(email) {
-  return normalizeEmail(email) === normalizeEmail(ADMIN_EMAIL);
+  return normalizeEmail(email) === getConfiguredAdminEmail();
 }
 
 async function requireAdminAuth() {
@@ -41,7 +55,7 @@ async function updateAdminNavigation() {
   });
 
   document.querySelectorAll('[data-admin-login-link]').forEach((link) => {
-    link.hidden = isAdmin;
+    link.hidden = true;
   });
 
   document.querySelectorAll('[data-logout-button]').forEach((button) => {
@@ -57,7 +71,7 @@ async function updateAdminNavigation() {
   });
 
   document.querySelectorAll('[data-admin-email-display]').forEach((el) => {
-    el.textContent = ADMIN_EMAIL;
+    el.textContent = getConfiguredAdminEmail() || DEFAULT_ADMIN_EMAIL;
   });
 
   return { session, isAdmin, email };
@@ -107,7 +121,7 @@ async function initAdminLoginPage() {
     const selectedMode = String(formData.get('mode') || 'signin');
 
     if (!isAdminEmail(email)) {
-      message.textContent = 'Ehhez az admin belépéshez csak a beállított admin e-mail használható.';
+      message.textContent = `Ehhez az admin belépéshez csak a beállított admin e-mail használható: ${getConfiguredAdminEmail() || DEFAULT_ADMIN_EMAIL}`;
       return;
     }
 
@@ -120,7 +134,7 @@ async function initAdminLoginPage() {
 
     try {
       if (selectedMode === 'signup') {
-        const { error } = await supabaseClient.auth.signUp({ email, password });
+        const { error } = await supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo: new URL('admin-login.html', window.location.href).href } });
         if (error) throw error;
         message.textContent = 'A fiók elkészült. Ha a Supabase e-mail megerősítést kér, nyisd meg a leveledet, utána jelentkezz be.';
         mode = 'signin';
