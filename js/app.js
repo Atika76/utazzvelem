@@ -96,7 +96,7 @@ const App = (() => {
   function tripCard(trip, admin=false) {
     const free = Number(trip.szabad_helyek ?? trip.helyek ?? 0);
     const total = Number(trip.auto_helyek ?? trip.osszes_hely ?? trip.helyek ?? 0);
-    const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['barion','cash']).map(m => m === 'cash' ? 'Készpénz a helyszínen' : 'Bankkártya (Barion)').join(' · ');
+    const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['transfer','cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
     const rating = trip.sofor_ertekeles || 4.9;
     const profile = `<div class="driver-mini"><strong>${escapeHtml(trip.nev || '')}</strong><span>${starRating(rating)}</span></div>`;
     return `
@@ -117,7 +117,7 @@ const App = (() => {
           <div class="trip-contact">
             <div><strong>Sofőr:</strong> ${escapeHtml(trip.nev || '')}</div>
             <div><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</div>
-            <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>
+            <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>${trip.bankszamla ? `<div><strong>Bankszámla:</strong> ${escapeHtml(trip.bankszamla)}</div>` : ''}
           </div>
         </div>
         <div>
@@ -157,7 +157,7 @@ const App = (() => {
             <span><strong>Telefon:</strong> ${escapeHtml(b.telefon || '')}</span>
             <span><strong>Helyek:</strong> ${escapeHtml(String(b.foglalt_helyek || 1))}</span>
           </div>
-          <p><strong>Fizetési mód:</strong> ${b.fizetesi_mod === 'cash' ? 'Készpénz a helyszínen' : 'Bankkártya (Barion)'}</p>
+          <p><strong>Fizetési mód:</strong> ${b.fizetesi_mod === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek'}</p>
           ${b.megjegyzes ? `<p>${escapeHtml(b.megjegyzes)}</p>` : ''}
         </div>
         <div>
@@ -235,12 +235,12 @@ const App = (() => {
     const text = `${trip.indulas} → ${trip.erkezes} | ${trip.datum} ${trip.ido} | ${fmtCurrency(trip.ar)} Ft / fő`;
     const dataUrl = shareCanvasDataUrl(trip);
     const blob = await (await fetch(dataUrl)).blob();
-    const file = new File([blob], 'utazzvelem-poszt.png', { type:'image/png' });
+    const file = new File([blob], 'utazzvelunk-poszt.png', { type:'image/png' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })) {
       try { await navigator.share({ title: APP_CONFIG.brandName, text, url, files:[file] }); return; } catch(_) {}
     }
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-    const a = document.createElement('a'); a.href = dataUrl; a.download = 'utazzvelem-poszt.png'; a.click();
+    const a = document.createElement('a'); a.href = dataUrl; a.download = 'utazzvelunk-poszt.png'; a.click();
   }
 
   function openModal(html) {
@@ -314,8 +314,8 @@ const App = (() => {
       telefon: phone,
       foglalt_helyek: seats,
       fizetesi_mod: method,
-      fizetesi_allapot: method === 'cash' ? 'Készpénz a helyszínen' : 'Barion kiválasztva',
-      foglalasi_allapot: method === 'cash' ? 'Jóváhagyva' : 'Fizetésre vár',
+      fizetesi_allapot: method === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek',
+      foglalasi_allapot: 'Foglalás elküldve',
       megjegyzes: note,
       utas_email: userEmail,
       utas_nev: fd.get('name')?.toString().trim() || ''
@@ -324,7 +324,7 @@ const App = (() => {
     const { error } = await sb.from(tableBookings).insert([booking]);
     if (error) throw error;
 
-    if (method === 'cash') {
+    if (method === 'cash' || method === 'transfer') {
       const { error: tripError } = await sb.from(tableTrips).update({
         helyek: freeNow - seats,
         szabad_helyek: freeNow - seats
@@ -366,7 +366,7 @@ const App = (() => {
               <label><span>Foglalt helyek</span><input name="seats" type="number" min="1" max="${trip.szabad_helyek ?? trip.helyek}" value="1" required></label>
             </div>
             <div class="grid-2">
-              <label><span>Fizetési mód</span><select name="paymentMethod"><option value="barion">Bankkártya (Barion)</option><option value="cash">Készpénz a helyszínen</option></select></label>
+              <label><span>Fizetési mód</span><select name="paymentMethod"><option value="transfer">Utalás a sofőrnek</option><option value="cash">Készpénz a sofőrnek</option></select></label>
               <label><span>Megjegyzés</span><input name="note" placeholder="pl. 1 nagy bőrönd"></label>
             </div>
             <div class="notice warn">Bankkártyás fizetéshez a Barion kereskedői kulcs és szerveroldali callback még szükséges. Készpénzes foglalásnál a rendszer azonnal lefoglalja a helyet.</div>
@@ -379,7 +379,7 @@ const App = (() => {
           const msg = wrap.querySelector('#bookingMsg'); msg.textContent = 'Mentés...';
           try {
             const booking = await submitBooking(trip, ev.currentTarget);
-            msg.textContent = booking.fizetesi_mod === 'cash' ? 'Sikeres foglalás. A hely lefoglalva.' : 'Foglalás rögzítve. A Barion fizetéshez még a kereskedői bekötés kell.';
+            msg.textContent = booking.fizetesi_mod === 'cash' ? 'Sikeres foglalási igény. A fizetés készpénzben a sofőrnél történik.' : 'Sikeres foglalási igény. Az utalási adatokat a sofőrrel egyeztetni kell.';
             msg.className = 'form-message';
             setTimeout(() => location.reload(), 1000);
           } catch(err) { msg.textContent = err.message || 'Nem sikerült a foglalás.'; }
@@ -555,7 +555,7 @@ const App = (() => {
       settingsForm.phone.value = settings?.contact_phone || APP_CONFIG.contactPhone;
       settingsForm.city.value = settings?.city || APP_CONFIG.city;
       settingsForm.adminEmail.value = settings?.admin_email || APP_CONFIG.adminEmail;
-      settingsForm.description.value = settings?.description || 'Gyors és biztonságos fuvarmegosztó felület utasoknak és sofőröknek.';
+      settingsForm.description.value = settings?.description || 'Gyors és biztonságos fuvarmegosztó felület utasoknak és sofőröknek, közvetlen sofőr–utas egyeztetéssel.';
       settingsForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const fd = new FormData(settingsForm);
@@ -593,7 +593,7 @@ const App = (() => {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      const subject = encodeURIComponent('Üzenet az Utazz Velem oldalról');
+      const subject = encodeURIComponent('Üzenet az Utazz Velünk oldalról');
       const body = encodeURIComponent(`Név: ${fd.get('name')}\nE-mail: ${fd.get('email')}\n\nÜzenet:\n${fd.get('message')}`);
       location.href = `mailto:${APP_CONFIG.contactEmail}?subject=${subject}&body=${body}`;
     });
