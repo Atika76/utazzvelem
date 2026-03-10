@@ -1,8 +1,7 @@
-window.sb = window.supabase.createClient(APP_CONFIG.supabaseUrl, APP_CONFIG.supabaseKey, {
+window.sb = supabase.createClient(APP_CONFIG.supabaseUrl, APP_CONFIG.supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce'
+    detectSessionInUrl: true
   }
 });

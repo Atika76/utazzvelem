@@ -1,3 +1,4 @@
+
 const App = (() => {
   const tableTrips = 'fuvarok';
   const tableBookings = 'foglalasok';
@@ -12,31 +13,15 @@ const App = (() => {
   function statusBadge(status='Függőben') {
     const n = normStatus(status);
     let cls = 'info';
-    if (n.includes('jóvá') || n.includes('fizetve') || n.includes('készpénz')) cls='approved';
+    if (n.includes('jóvá') || n.includes('foglalt') || n.includes('készpénz')) cls='approved';
     else if (n.includes('függ') || n.includes('vár')) cls='pending';
     else if (n.includes('töröl') || n.includes('elutas')) cls='rejected';
     return `<span class="status ${cls}">${escapeHtml(status)}</span>`;
   }
-  function seatBar(free, total) {
-    const t = Math.max(1, Number(total||free||0));
-    const f = Math.max(0, Number(free||0));
-    const used = Math.max(0, t - f);
-    const percent = Math.max(0, Math.min(100, Math.round((used / t) * 100)));
-    return `<div class="seat-bar-wrap"><div class="seat-bar"><span style="width:${percent}%"></span></div><small>${used}/${t} hely foglalt · ${f} szabad</small></div>`;
-  }
-  function starRating(value=4.8) {
-    const v = Number(value || 4.8);
-    const full = Math.floor(v);
-    const half = v - full >= 0.5;
-    let out = '';
-    for (let i=0;i<5;i++) out += i < full ? '★' : (i === full && half ? '☆' : '☆');
-    return `<span class="stars">${out}</span> <span class="rating-num">${v.toFixed(1)}</span>`;
-  }
-  function cityNorm(s='') { return String(s).toLowerCase().replace(/\s+/g,' ').trim(); }
 
   async function fetchSettings() {
     try {
-      const { data } = await sb.from(tableSettings).select('*').order('id', { ascending: true }).limit(1).maybeSingle();
+      const { data } = await sb.from(tableSettings).select('*').order('id',{ascending:true}).limit(1).maybeSingle();
       return data || null;
     } catch (e) { return null; }
   }
@@ -53,7 +38,7 @@ const App = (() => {
   }
 
   async function fetchApprovedTrips(filters={}) {
-    let q = sb.from(tableTrips).select('*').eq('statusz','Jóváhagyva').order('datum',{ascending:true}).order('ido',{ascending:true});
+    let q = sb.from(tableTrips).select('*').or('status.eq.Jóváhagyva,statusz.eq.Jóváhagyva').order('datum',{ascending:true}).order('ido',{ascending:true});
     if (filters.origin) q = q.ilike('indulas', `%${filters.origin}%`);
     if (filters.destination) q = q.ilike('erkezes', `%${filters.destination}%`);
     if (filters.date) q = q.eq('datum', filters.date);
@@ -68,66 +53,51 @@ const App = (() => {
     return data || [];
   }
 
-  async function fetchTripById(id) {
-    const { data, error } = await sb.from(tableTrips).select('*').eq('id', id).maybeSingle();
-    if (error) throw error;
-    return data || null;
-  }
-
   async function fetchBookings() {
     const { data, error } = await sb.from(tableBookings).select('*').order('created_at', {ascending:false});
     if (error) throw error;
     return data || [];
   }
 
-  function buildRecommendations(trips, filters) {
-    const o = cityNorm(filters.origin);
-    const d = cityNorm(filters.destination);
-    return trips.filter(t => {
-      const ti = cityNorm(t.indulas);
-      const te = cityNorm(t.erkezes);
-      if (o && d) return (te.includes(d) || ti.includes(o)) && !(ti.includes(o) && te.includes(d));
-      if (o) return te.includes(o) || ti.includes(o);
-      if (d) return te.includes(d) || ti.includes(d);
-      return false;
-    }).slice(0,4);
-  }
-
   function tripCard(trip, admin=false) {
-    const free = Number(trip.szabad_helyek ?? trip.helyek ?? 0);
-    const total = Number(trip.auto_helyek ?? trip.osszes_hely ?? trip.helyek ?? 0);
-    const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['barion','cash']).map(m => m === 'cash' ? 'Készpénz a helyszínen' : 'Bankkártya (Barion)').join(' · ');
-    const rating = trip.sofor_ertekeles || 4.9;
-    const profile = `<div class="driver-mini"><strong>${escapeHtml(trip.nev || '')}</strong><span>${starRating(rating)}</span></div>`;
+    const free = Number(trip.helyek || 0);
+    const total = Number(trip.osszes_hely || trip.helyek || 0);
+    const paymentMethods = 'Készpénz a helyszínen';
+    const filled = Math.max(0, total - free);
+    const occupancy = total > 0 ? Math.round((filled / total) * 100) : 0;
+    const driverRating = Number(trip.sofor_ertekeles || 4.9).toFixed(1);
+    const tripUrl = `trip.html?id=${trip.id}`;
     return `
       <article class="card trip-card" data-trip-id="${trip.id}">
         <div class="trip-main">
-          <div class="inline-pills"><span class="pill">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</span>${statusBadge(trip.statusz || 'Jóváhagyva')}</div>
-          <h3>${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</h3>
-          ${profile}
+          <div class="inline-pills"><span class="pill">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</span>${statusBadge(trip.status || trip.statusz || 'Jóváhagyva')}</div>
+          <h3>${escapeHtml(trip.indulas)}<br>→ ${escapeHtml(trip.erkezes)}</h3>
           <div class="trip-meta">
             <span><strong>Dátum:</strong> ${escapeHtml(trip.datum || '')}</span>
             <span><strong>Idő:</strong> ${escapeHtml(trip.ido || '')}</span>
             <span><strong>Ár:</strong> ${fmtCurrency(trip.ar)} Ft / fő</span>
             <span><strong>Autó:</strong> ${escapeHtml(trip.auto_tipus || 'Személyautó')}</span>
-            <span><strong>Férőhely:</strong> ${total}</span>
+            <span><strong>Helyek:</strong> ${total} összesen / ${free} szabad</span>
+            <span><strong>Profil:</strong> ⭐ ${driverRating}</span>
           </div>
-          ${seatBar(free,total)}
           <p>${escapeHtml(trip.megjegyzes || '')}</p>
           <div class="trip-contact">
             <div><strong>Sofőr:</strong> ${escapeHtml(trip.nev || '')}</div>
+            <div><strong>Értékelés:</strong> ⭐ ${driverRating} · megbízható sofőr</div>
             <div><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</div>
             <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>
           </div>
+          <div class="seat-progress"><span style="width:${occupancy}%"></span></div>
+          <div class="small-help">${filled}/${total} hely foglalt</div>
         </div>
         <div>
-          <div class="card info-card">
-            <div class="small-help">Útvonal és megosztás</div>
-            <p style="margin:8px 0 0;color:var(--muted)">Térkép, külön fuvaroldal és Facebook-poszt kép.</p>
+          <div class="card" style="padding:16px">
+            <div class="small-help">Útvonal előnézet</div>
+            <p style="margin:8px 0 0;color:var(--muted)">Kattints a térképre vagy a foglalás gombra a részletekhez.</p>
             <div class="inline-pills" style="margin-top:12px">
               <button class="btn btn-ghost js-map-focus" data-origin="${escapeHtml(trip.indulas)}" data-destination="${escapeHtml(trip.erkezes)}">Térkép</button>
+              <a class="btn btn-ghost" href="${tripUrl}">Részletek</a>
               <button class="btn btn-ghost js-share-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}'>Megosztás</button>
-              <a class="btn btn-ghost" href="trip.html?id=${trip.id}">Részletek</a>
             </div>
           </div>
         </div>
@@ -157,11 +127,11 @@ const App = (() => {
             <span><strong>Telefon:</strong> ${escapeHtml(b.telefon || '')}</span>
             <span><strong>Helyek:</strong> ${escapeHtml(String(b.foglalt_helyek || 1))}</span>
           </div>
-          <p><strong>Fizetési mód:</strong> ${b.fizetesi_mod === 'cash' ? 'Készpénz a helyszínen' : 'Bankkártya (Barion)'}</p>
+          <p><strong>Fizetési mód:</strong> Készpénz a helyszínen</p>
           ${b.megjegyzes ? `<p>${escapeHtml(b.megjegyzes)}</p>` : ''}
         </div>
         <div>
-          <p><strong>Foglalás:</strong> ${escapeHtml(b.foglalasi_allapot || '')}</p>
+          <p><strong>Állapot:</strong> ${escapeHtml(b.foglalasi_allapot || '')}</p>
           <p><strong>Fizetés:</strong> ${escapeHtml(b.fizetesi_allapot || '')}</p>
           <p><strong>Létrehozva:</strong> ${escapeHtml(String(b.created_at || '')).slice(0,16).replace('T',' ')}</p>
         </div>
@@ -175,12 +145,12 @@ const App = (() => {
 
   async function geocodePlace(place) {
     const key = 'geo:' + place.toLowerCase();
-    try { const cached = sessionStorage.getItem(key); if (cached) return JSON.parse(cached); } catch(_){ }
+    try { const cached = sessionStorage.getItem(key); if (cached) return JSON.parse(cached); } catch(_){}
     const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(place + ', Hungary');
     const res = await fetch(url, { headers: { 'Accept-Language':'hu' } });
     const data = await res.json();
     const first = data && data[0] ? { lat:Number(data[0].lat), lon:Number(data[0].lon) } : null;
-    if (first) try { sessionStorage.setItem(key, JSON.stringify(first)); } catch(_){ }
+    if (first) try { sessionStorage.setItem(key, JSON.stringify(first)); } catch(_){}
     return first;
   }
 
@@ -224,14 +194,14 @@ const App = (() => {
     ctx.font = '36px Arial'; ctx.fillStyle = '#dbe8ff';
     ctx.fillText(`${trip.datum} • ${trip.ido}`, 72, 245);
     ctx.fillText(`${fmtCurrency(trip.ar)} Ft / fő`, 72, 300);
-    ctx.fillText(`${trip.szabad_helyek ?? trip.helyek ?? 0} szabad hely`, 72, 355);
+    ctx.fillText(`${trip.helyek || 0} szabad hely`, 72, 355);
     ctx.font = '30px Arial'; ctx.fillStyle = '#b8c9ea';
     ctx.fillText(APP_CONFIG.brandName + ' • ' + APP_CONFIG.siteUrl, 72, 560);
     return c.toDataURL('image/png');
   }
 
   async function shareTrip(trip) {
-    const url = APP_CONFIG.siteUrl + 'trip.html?id=' + trip.id;
+    const url = APP_CONFIG.siteUrl + 'fuvarok.html';
     const text = `${trip.indulas} → ${trip.erkezes} | ${trip.datum} ${trip.ido} | ${fmtCurrency(trip.ar)} Ft / fő`;
     const dataUrl = shareCanvasDataUrl(trip);
     const blob = await (await fetch(dataUrl)).blob();
@@ -239,8 +209,8 @@ const App = (() => {
     if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })) {
       try { await navigator.share({ title: APP_CONFIG.brandName, text, url, files:[file] }); return; } catch(_) {}
     }
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
     const a = document.createElement('a'); a.href = dataUrl; a.download = 'utazzvelem-poszt.png'; a.click();
+    alert('A megosztó kép letöltődött. Ezt fel tudod tölteni Facebookra vagy Messengerbe.');
   }
 
   function openModal(html) {
@@ -257,7 +227,7 @@ const App = (() => {
     try {
       await fetch(APP_CONFIG.notificationFunctionUrl, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ type, payload, adminEmail: await AppAuth.fetchAdminEmail() })
+        body: JSON.stringify({ type, payload, adminEmail: APP_CONFIG.adminEmail })
       });
     } catch (_) {}
   }
@@ -267,8 +237,8 @@ const App = (() => {
     const user = session?.user;
     const fd = new FormData(form);
     const totalSeats = Number(fd.get('osszHely') || 0);
-    const freeSeats = Number(fd.get('szabadHely') || totalSeats || 0);
-    const payment = Array.from(form.querySelectorAll('input[name="fizetesiMod"]:checked')).map(x => x.value);
+    const freeSeats = Number(fd.get('szabadHely') || 0);
+    const payment = ['cash'];
     const payload = {
       user_id: user?.id || null,
       nev: fd.get('driverName')?.toString().trim() || '',
@@ -279,15 +249,12 @@ const App = (() => {
       datum: fd.get('date')?.toString() || '',
       ido: fd.get('time')?.toString() || '',
       helyek: freeSeats,
-      szabad_helyek: freeSeats,
       osszes_hely: totalSeats,
-      auto_helyek: totalSeats,
       auto_tipus: fd.get('carType')?.toString().trim() || '',
       ar: Number(fd.get('price') || 0),
       megjegyzes: fd.get('note')?.toString().trim() || '',
       statusz: 'Függőben',
-      fizetesi_modok: payment.length ? payment : ['cash'],
-      sofor_ertekeles: 5
+      fizetesi_modok: ['cash']
     };
     const { error } = await sb.from(tableTrips).insert([payload]);
     if (error) throw error;
@@ -299,13 +266,14 @@ const App = (() => {
     const user = session?.user;
     const fd = new FormData(form);
     const seats = Number(fd.get('seats') || 1);
-    const method = fd.get('paymentMethod')?.toString() || 'cash';
+    const method = 'cash';
     const phone = fd.get('phone')?.toString().trim() || '';
     const note = fd.get('note')?.toString().trim() || '';
     const userEmail = user?.email || '';
-    const freeNow = Number(trip.szabad_helyek ?? trip.helyek ?? 0);
+
     if (seats < 1) throw new Error('Legalább 1 helyet válassz.');
-    if (seats > freeNow) throw new Error('Nincs ennyi szabad hely.');
+    if (seats > Number(trip.helyek || 0)) throw new Error('Nincs ennyi szabad hely.');
+
     const booking = {
       trip_id: trip.id,
       user_id: user?.id || null,
@@ -313,22 +281,17 @@ const App = (() => {
       email: userEmail,
       telefon: phone,
       foglalt_helyek: seats,
-      fizetesi_mod: method,
-      fizetesi_allapot: method === 'cash' ? 'Készpénz a helyszínen' : 'Barion kiválasztva',
-      foglalasi_allapot: method === 'cash' ? 'Jóváhagyva' : 'Fizetésre vár',
-      megjegyzes: note,
-      utas_email: userEmail,
-      utas_nev: fd.get('name')?.toString().trim() || ''
+      fizetesi_mod: 'cash',
+      fizetesi_allapot: 'Készpénz a helyszínen',
+      foglalasi_allapot: 'Jóváhagyva',
+      megjegyzes: note
     };
 
     const { error } = await sb.from(tableBookings).insert([booking]);
     if (error) throw error;
 
     if (method === 'cash') {
-      const { error: tripError } = await sb.from(tableTrips).update({
-        helyek: freeNow - seats,
-        szabad_helyek: freeNow - seats
-      }).eq('id', trip.id);
+      const { error: tripError } = await sb.from(tableTrips).update({ helyek: Number(trip.helyek) - seats }).eq('id', trip.id);
       if (tripError) throw tripError;
     }
     await notifyAdmin('uj_foglalas', booking);
@@ -350,7 +313,7 @@ const App = (() => {
       }
       const bookBtn = e.target.closest('.js-book-trip');
       if (bookBtn) {
-        const ok = await AppAuth.requireAuth('fuvarok.html');
+        const ok = await AppAuth.requireAuth('belepes.html');
         if (!ok) return;
         const trip = JSON.parse(decodeURIComponent(bookBtn.dataset.trip));
         const session = await AppAuth.getSession();
@@ -363,13 +326,13 @@ const App = (() => {
             </div>
             <div class="grid-2">
               <label><span>Telefonszám</span><input name="phone" required></label>
-              <label><span>Foglalt helyek</span><input name="seats" type="number" min="1" max="${trip.szabad_helyek ?? trip.helyek}" value="1" required></label>
+              <label><span>Foglalt helyek</span><input name="seats" type="number" min="1" max="${trip.helyek}" value="1" required></label>
             </div>
             <div class="grid-2">
-              <label><span>Fizetési mód</span><select name="paymentMethod"><option value="barion">Bankkártya (Barion)</option><option value="cash">Készpénz a helyszínen</option></select></label>
+              <label><span>Fizetés</span><input value="Készpénz a helyszínen" disabled></label>
               <label><span>Megjegyzés</span><input name="note" placeholder="pl. 1 nagy bőrönd"></label>
             </div>
-            <div class="notice warn">Bankkártyás fizetéshez a Barion kereskedői kulcs és szerveroldali callback még szükséges. Készpénzes foglalásnál a rendszer azonnal lefoglalja a helyet.</div>
+            <div class="notice good">A foglalás készpénzes, a helyet azonnal lefoglalja a rendszer.</div>
             <div class="form-message" id="bookingMsg"></div>
             <button class="btn btn-primary" type="submit">Foglalás rögzítése</button>
           </form>
@@ -379,9 +342,9 @@ const App = (() => {
           const msg = wrap.querySelector('#bookingMsg'); msg.textContent = 'Mentés...';
           try {
             const booking = await submitBooking(trip, ev.currentTarget);
-            msg.textContent = booking.fizetesi_mod === 'cash' ? 'Sikeres foglalás. A hely lefoglalva.' : 'Foglalás rögzítve. A Barion fizetéshez még a kereskedői bekötés kell.';
+            msg.textContent = 'Sikeres foglalás. A hely lefoglalva.';
             msg.className = 'form-message';
-            setTimeout(() => location.reload(), 1000);
+            setTimeout(() => location.reload(), 900);
           } catch(err) { msg.textContent = err.message || 'Nem sikerült a foglalás.'; }
         });
         return;
@@ -395,16 +358,15 @@ const App = (() => {
       const approveBooking = e.target.closest('.js-booking-approve');
       if (approveBooking) {
         const id = approveBooking.dataset.id, tripId = approveBooking.dataset.tripId, seats = Number(approveBooking.dataset.seats || 1);
-        const { data: trip } = await sb.from(tableTrips).select('helyek, szabad_helyek').eq('id', tripId).single();
-        const free = Number(trip?.szabad_helyek ?? trip?.helyek ?? 0);
-        if (trip && free >= seats) {
-          await sb.from(tableTrips).update({ helyek: free - seats, szabad_helyek: free - seats }).eq('id', tripId);
+        const { data: trip } = await sb.from(tableTrips).select('helyek').eq('id', tripId).single();
+        if (trip && Number(trip.helyek || 0) >= seats) {
+          await sb.from(tableTrips).update({ helyek: Number(trip.helyek) - seats }).eq('id', tripId);
           await sb.from(tableBookings).update({ foglalasi_allapot:'Jóváhagyva', fizetesi_allapot:'Készpénz a helyszínen' }).eq('id', id);
         }
         location.reload(); return;
       }
       const paidBooking = e.target.closest('.js-booking-paid');
-      if (paidBooking) { await sb.from(tableBookings).update({ fizetesi_allapot:'Fizetve', foglalasi_allapot:'Jóváhagyva' }).eq('id', paidBooking.dataset.id); location.reload(); return; }
+      if (paidBooking) { await sb.from(tableBookings).update({ fizetesi_allapot:'Fizetve' }).eq('id', paidBooking.dataset.id); location.reload(); return; }
       const cancelBooking = e.target.closest('.js-booking-cancel');
       if (cancelBooking) { if (confirm('Biztosan törlöd ezt a foglalást?')) { await sb.from(tableBookings).delete().eq('id', cancelBooking.dataset.id); location.reload(); } return; }
     });
@@ -420,15 +382,14 @@ const App = (() => {
           <div class="inline-pills">${statusBadge('Jóváhagyva')}</div>
           <h3>${escapeHtml(t.indulas)} → ${escapeHtml(t.erkezes)}</h3>
           <p class="lead">${escapeHtml(t.datum)} • ${escapeHtml(t.ido)} • ${fmtCurrency(t.ar)} Ft / fő</p>
-          ${seatBar(Number(t.szabad_helyek ?? t.helyek ?? 0), Number(t.auto_helyek ?? t.osszes_hely ?? t.helyek ?? 0))}
           <p>${escapeHtml(t.megjegyzes || '')}</p>
-          <a class="btn btn-secondary" href="trip.html?id=${t.id}">Részletek</a>
+          <div class="inline-pills"><span class="pill">${t.osszes_hely || t.helyek || 0} férőhely</span><span class="pill">${t.helyek || 0} szabad</span></div>
         </article>`).join('') : '<div class="empty-state">Még nincs jóváhagyott fuvar.</div>';
     } catch (_) { featured.innerHTML = '<div class="empty-state">A fuvarok betöltése átmenetileg nem elérhető.</div>'; }
     document.getElementById('quickSearchForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
       const p = new URLSearchParams();
-      [['quickOrigin','origin'],['quickDestination','destination'],['quickDate','date']].forEach(([id,key]) => { const v = document.getElementById(id)?.value?.trim(); if (v) p.set(key, v); });
+      ['quickOrigin','quickDestination','quickDate'].forEach(id => { const v = document.getElementById(id)?.value?.trim(); if (v) p.set(id.replace('quick','').toLowerCase(), v); });
       location.href = 'fuvarok.html?' + p.toString();
     });
   }
@@ -447,21 +408,13 @@ const App = (() => {
     destinationInput.value = params.get('destination') || '';
     dateInput.value = params.get('date') || '';
     const list = document.getElementById('tripsList');
-    const recWrap = document.getElementById('recommendedTrips');
 
     async function render() {
       list.innerHTML = '<div class="empty-state">Betöltés...</div>';
-      if (recWrap) recWrap.innerHTML = '';
       try {
-        const filters = { origin:originInput.value.trim(), destination:destinationInput.value.trim(), date:dateInput.value };
-        const trips = await fetchApprovedTrips(filters);
+        const trips = await fetchApprovedTrips({ origin:originInput.value.trim(), destination:destinationInput.value.trim(), date:dateInput.value });
         list.innerHTML = trips.length ? trips.map(t => tripCard(t, false)).join('') : '<div class="empty-state">Nincs a keresésnek megfelelő fuvar.</div>';
         if (trips[0]) focusRoute(trips[0].indulas, trips[0].erkezes);
-        if (!trips.length && recWrap) {
-          const all = await fetchApprovedTrips({});
-          const rec = buildRecommendations(all, filters);
-          recWrap.innerHTML = rec.length ? `<h3>Ajánlott fuvarok</h3>${rec.map(t=>tripCard(t,false)).join('')}` : '';
-        }
       } catch (e) { list.innerHTML = '<div class="empty-state">A fuvarok jelenleg nem tölthetők be.</div>'; }
     }
     await render();
@@ -471,12 +424,13 @@ const App = (() => {
   async function initTripFormPage() {
     const form = document.getElementById('tripForm');
     if (!form) return;
-    const ok = await AppAuth.requireAuth('fuvar-feladas.html');
+    const ok = await AppAuth.requireAuth('belepes.html');
     if (!ok) return;
     const session = await AppAuth.getSession();
     const user = session?.user;
     form.querySelector('[name="contactEmail"]').value = user?.email || '';
     form.querySelector('[name="contactEmail"]').readOnly = true;
+    if (user?.user_metadata?.full_name || user?.user_metadata?.name) { form.querySelector('[name="driverName"]').value = user.user_metadata.full_name || user.user_metadata.name; }
     const total = form.querySelector('[name="osszHely"]');
     const free = form.querySelector('[name="szabadHely"]');
     total.addEventListener('input', () => free.value = total.value);
@@ -490,7 +444,7 @@ const App = (() => {
         form.reset();
         form.querySelector('[name="contactEmail"]').value = user?.email || '';
       } catch (err) {
-        msg.textContent = err.message || 'Nem sikerült menteni.';
+        msg.textContent = 'Nem sikerült menteni. Ha a táblák még nincsenek létrehozva, futtasd a mellékelt Supabase SQL fájlt.';
       }
     });
   }
@@ -498,20 +452,12 @@ const App = (() => {
   async function initAuthPage() {
     if (!document.getElementById('loginForm')) return;
     const { session } = await AppAuth.updateNav();
-    AppAuth.bindLogout();
-    AppAuth.watchAuth();
     if (session) {
       location.href = (await AppAuth.isAdmin()) ? 'admin.html' : 'index.html';
       return;
     }
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
-    document.getElementById('facebookLoginBtn')?.addEventListener('click', async () => {
-      const msg = document.getElementById('loginMsg');
-      msg.textContent = 'Facebook belépés indítása...';
-      const { error } = await AppAuth.signInWithFacebook();
-      if (error) msg.textContent = 'A Facebook belépéshez a Supabase-ben a Facebook providert is be kell állítani.';
-    });
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(loginForm);
@@ -557,19 +503,14 @@ const App = (() => {
         const fd = new FormData(settingsForm);
         msg.textContent = 'Mentés...';
         const payload = {
+          id: settings?.id || 1,
           site_name: fd.get('siteName'), company_name: fd.get('companyName'), contact_email: fd.get('email'),
           contact_phone: fd.get('phone'), city: fd.get('city'), admin_email: fd.get('adminEmail'), description: fd.get('description')
         };
-        if (settings?.id) payload.id = settings.id;
         try { APP_CONFIG.adminEmail = String(fd.get('adminEmail') || APP_CONFIG.adminEmail); } catch (_) {}
-        let error = null;
-        if (settings?.id) {
-          ({ error } = await sb.from(tableSettings).update(payload).eq('id', settings.id));
-        } else {
-          ({ error } = await sb.from(tableSettings).insert([payload]));
-        }
+        const { error } = await sb.from(tableSettings).upsert(payload, { onConflict:'id' });
+        if (!error) { adminEmailCache = null; }
         msg.textContent = error ? 'Nem sikerült menteni.' : 'Mentve.';
-        if (!error) location.reload();
       });
     }
     try {
@@ -580,7 +521,7 @@ const App = (() => {
       const [bookings, trips] = await Promise.all([fetchBookings(), fetchAllTrips()]);
       const tripMap = Object.fromEntries(trips.map(t => [String(t.id), t]));
       bookingsWrap.innerHTML = bookings.length ? bookings.map(b => bookingCard(b, tripMap)).join('') : '<div class="empty-state">Még nincs foglalás.</div>';
-    } catch (e) { bookingsWrap.innerHTML = '<div class="empty-state">A foglalások betöltése nem sikerült.</div>'; }
+    } catch (e) { bookingsWrap.innerHTML = '<div class="empty-state">A foglalások táblája még nincs létrehozva. Futtasd a mellékelt SQL fájlt, és utána már működik.</div>'; }
   }
 
   async function initContactPage() {
@@ -595,25 +536,60 @@ const App = (() => {
     });
   }
 
-  async function initTripDetailPage() {
-    const wrap = document.getElementById('tripDetail');
+
+  async function fetchTripById(id) {
+    const { data, error } = await sb.from(tableTrips).select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data || null;
+  }
+
+  async function fetchSuggestedTrips(trip) {
+    if (!trip) return [];
+    let q = sb.from(tableTrips).select('*').neq('id', trip.id).or(`indulas.ilike.%${trip.indulas}%,erkezes.ilike.%${trip.erkezes}%`).limit(3);
+    const { data } = await q;
+    return data || [];
+  }
+
+  async function initTripDetailsPage() {
+    const wrap = document.getElementById('tripDetailWrap');
     if (!wrap) return;
-    const id = new URLSearchParams(location.search).get('id');
-    if (!id) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    if (!id) { wrap.innerHTML = '<div class="empty-state">Ehhez a fuvarhoz nincs megadva azonosító.</div>'; return; }
     try {
       const trip = await fetchTripById(id);
-      if (!trip) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
-      wrap.innerHTML = tripCard(trip, false) + `<section class="card detail-extra"><h2>Sofőr profil</h2><p><strong>${escapeHtml(trip.nev || '')}</strong></p><p>${starRating(trip.sofor_ertekeles || 4.9)}</p><p>Kapcsolat: ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p></section>`;
+      if (!trip) { wrap.innerHTML = '<div class="empty-state">A keresett fuvar nem található.</div>'; return; }
+      const free = Number(trip.helyek || 0);
+      const total = Number(trip.osszes_hely || trip.helyek || 0);
+      const filled = Math.max(0, total - free);
+      const rating = Number(trip.sofor_ertekeles || 4.9).toFixed(1);
+      wrap.innerHTML = `<div class="section-head"><div><span class="eyebrow">Fuvar részletei</span><h1 class="page-title" style="font-size:2.6rem">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</h1></div></div>
+        <div class="two-col">
+          <div>
+            <div class="trip-meta"><span><strong>Dátum:</strong> ${escapeHtml(trip.datum || '')}</span><span><strong>Idő:</strong> ${escapeHtml(trip.ido || '')}</span><span><strong>Ár:</strong> ${fmtCurrency(trip.ar)} Ft / fő</span></div>
+            <p class="lead">${escapeHtml(trip.megjegyzes || 'Megbízható, egyeztethető fuvar.')}</p>
+            <div class="seat-progress"><span style="width:${total ? Math.round((filled/total)*100) : 0}%"></span></div>
+            <div class="small-help" style="margin-top:10px">${filled}/${total} hely foglalt · ${free} szabad hely</div>
+          </div>
+          <div class="card" style="padding:18px">
+            <h3 style="margin-top:0">Sofőr profil</h3>
+            <p><strong>${escapeHtml(trip.nev || 'Sofőr')}</strong></p>
+            <p>⭐ ${rating} · megbízható sofőr</p>
+            <p>${escapeHtml(trip.auto_tipus || 'Személyautó')}</p>
+            <div class="trip-actions"><button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${free < 1 ? 'disabled' : ''}>${free < 1 ? 'Betelt' : 'Foglalás'}</button><button class="btn btn-ghost js-share-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}'>Megosztás</button></div>
+          </div>
+        </div>`;
       await focusRoute(trip.indulas, trip.erkezes);
+      const suggested = await fetchSuggestedTrips(trip);
+      const recWrap = document.getElementById('recommendedTrips');
+      if (recWrap) recWrap.innerHTML = suggested.length ? suggested.map(t => tripCard(t, false)).join('') : '<div class="empty-state">Jelenleg nincs hasonló útvonal ajánlat.</div>';
     } catch (_) {
-      wrap.innerHTML = '<div class="empty-state">A fuvar betöltése nem sikerült.</div>';
+      wrap.innerHTML = '<div class="empty-state">A fuvar részletei most nem tölthetők be.</div>';
     }
   }
 
   async function init() {
     await AppAuth.updateNav();
-    AppAuth.bindLogout();
-    AppAuth.watchAuth();
     await applySettings();
     bindGlobalActions();
     await initHome();
@@ -622,7 +598,7 @@ const App = (() => {
     await initAuthPage();
     await initAdminPage();
     await initContactPage();
-    await initTripDetailPage();
+    await initTripDetailsPage();
   }
 
   return { init, focusRoute };
