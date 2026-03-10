@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://atika76.github.io/utazzvelem/</loc></url>
-  <url><loc>https://atika76.github.io/utazzvelem/fuvarok.html</loc></url>
-  <url><loc>https://atika76.github.io/utazzvelem/fuvar-feladas.html</loc></url>
-  <url><loc>https://atika76.github.io/utazzvelem/belepes.html</loc></url>
-  <url><loc>https://atika76.github.io/utazzvelem/kapcsolat.html</loc></url>
+  <url>
+    <loc>https://utazzvelunk.hu/</loc>
+  </url>
+  <url>
+    <loc>https://utazzvelunk.hu/index.html</loc>
+  </url>
+  <url>
+    <loc>https://utazzvelunk.hu/fuvarok.html</loc>
+  </url>
+  <url>
+    <loc>https://utazzvelunk.hu/fuvar-feladas.html</loc>
+  </url>
+  <url>
+    <loc>https://utazzvelunk.hu/belepes.html</loc>
+  </url>
+  <url>
+    <loc>https://utazzvelunk.hu/admin.html</loc>
+  </url>
+  <url>
+    <loc>https://utazzvelunk.hu/kapcsolat.html</loc>
+  </url>
+  <url>
+    <loc>https://utazzvelunk.hu/trip.html</loc>
+  </url>
 </urlset>
