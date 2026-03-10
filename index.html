@@ -1,89 +1,41 @@
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-  <link rel="stylesheet" href="styles.css" />
-  <title>Utazz Velem – Fuvarmegosztás gyorsan és biztonságosan</title>
-</head>
-<body>
-  <header class="site-header">
-    <div class="container nav">
-      <a class="logo-wrap" href="index.html"><img src="assets/logo-utazzvelem.svg" alt="Utazz Velem logo"><span data-brand>Utazz Velem</span></a>
-      <nav>
-        <a href="index.html">Főoldal</a>
-        <a href="fuvarok.html">Fuvarok</a>
-        <a href="fuvar-feladas.html">Fuvar feladása</a>
-        <a href="kapcsolat.html">Kapcsolat</a>
-        <a href="belepes.html" data-auth="guest">Belépés / regisztráció</a>
-        <span class="user-chip hidden" data-auth="user" data-user-name></span>
-        <a href="admin.html" data-auth="admin" class="hidden">Admin</a>
-        <button type="button" data-auth="user" data-logout class="linkish hidden">Kilépés</button>
-      </nav>
-    </div>
-  </header>
-  <main>
-    <section class="hero">
-      <div class="container hero-grid">
-        <div>
-          <span class="badge">Biztonságos fuvarmegosztás utasoknak és sofőröknek</span>
-          <h1>Találj fuvart, vagy töltsd meg a szabad helyeidet egyszerűen.</h1>
-          <p class="lead">Regisztráció után pár kattintással feladhatsz egy utat, az utasok pedig könnyen foglalhatnak. Átlátható állapotok, admin jóváhagyás, térképes előnézet és megosztás egy helyen.</p>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:28px">
-            <a class="btn btn-primary" href="fuvarok.html">Fuvarok keresése</a>
-            <a class="btn btn-secondary" href="fuvar-feladas.html">Fuvar feladása</a>
-          </div>
-        </div>
-        <div class="card">
-          <h2 style="margin-top:0">Gyors kereső</h2>
-          <form id="quickSearchForm" class="grid-2">
-            <label><span>Indulási hely</span><input id="quickOrigin" placeholder="pl. Budapest"></label>
-            <label><span>Érkezési hely</span><input id="quickDestination" placeholder="pl. Győr"></label>
-            <label><span>Dátum</span><input id="quickDate" type="date"></label>
-            <label><span>&nbsp;</span><button class="btn btn-primary" type="submit">Keresés</button></label>
-          </form>
-          <hr class="soft">
-          <div class="inline-pills">
-            <span class="pill">Belépés / regisztráció</span>
-            <span class="pill">Foglalási állapot</span>
-            <span class="pill">Készpénz vagy kártya</span>
-            <span class="pill">Térkép + megosztás</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="section-head"><div><span class="eyebrow">Miért jó?</span><h2>Egyszerű, gyors, átlátható rendszer</h2></div></div>
-        <div class="cards-3">
-          <article class="card"><h3>Regisztráció után fuvarfeladás</h3><p class="lead">Csak belépett felhasználó tud fuvart feladni, így rendezettebb és biztonságosabb a rendszer.</p></article>
-          <article class="card"><h3>Foglalás valós szabad helyekkel</h3><p class="lead">Minden fuvarnál látszik, hány férőhely van az autóban és mennyi a szabad hely.</p></article>
-          <article class="card"><h3>Megosztás és térképes előnézet</h3><p class="lead">A fuvarokat egy kattintással meg lehet osztani, és térképen is előnézhetők.</p></article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="section-head"><div><span class="eyebrow">Friss ajánlatok</span><h2>Elérhető fuvarok</h2></div><a class="text-link" href="fuvarok.html">Összes fuvar</a></div>
-        <div id="featuredTrips" class="cards-3"></div>
-      </div>
-    </section>
-  </main>
-  <footer class="site-footer">
-    <div class="container footer-grid">
-      <div><strong data-setting="siteName">Utazz Velem</strong><p>Fuvarmegosztó felület utasoknak és sofőröknek. Regisztráció, foglalás, státuszkövetés és admin kezelés egy rendszerben.</p></div>
-      <div><strong>Kapcsolat</strong><p>E-mail: <span data-setting="email"></span></p><p>Telefon: <span data-setting="phone"></span></p><p>Város: <span data-setting="city"></span></p></div>
-    </div>
-  </footer>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="js/config.js"></script>
-  <script src="js/supabase-client.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/app.js"></script>
-</body>
-</html>
+<!DOCTYPE html><html lang="hu"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="styles.css"><title>Utazz Velem</title></head><body>
+<header class="site-header"><div class="container nav">
+<a class="logo-wrap" href="index.html"><img src="assets/logo-utazzvelem.svg" alt="Utazz Velem"><span data-brand>Utazz Velem</span></a>
+<nav>
+<a href="index.html">Főoldal</a><a href="fuvarok.html">Fuvarok</a><a href="fuvar-feladas.html">Fuvar feladása</a><a href="kapcsolat.html">Kapcsolat</a>
+<a href="belepes.html" data-auth="guest">Belépés / regisztráció</a>
+<span data-user-label data-auth="user" class="nav-user hidden"></span>
+<a href="admin.html" data-auth="admin" class="hidden">Admin</a>
+<button type="button" data-auth="user" data-logout class="hidden">Kilépés</button>
+</nav></div></header>
+<main class="container">
+<section class="hero">
+<div>
+<span class="eyebrow">Magánszemélyeknek és utazóknak</span>
+<h1>Utazz okosabban, töltsd meg az autód vagy találj helyet gyorsan.</h1>
+<p class="lead">Regisztráció után egyszerűen adhatsz fel fuvart, foglalhatsz helyet, térképen nézheted az útvonalat, és meg is oszthatod a fuvart Facebook-poszt képpel.</p>
+<div class="row-actions"><a class="btn btn-primary" href="fuvarok.html">Fuvarok böngészése</a><a class="btn btn-secondary" href="fuvar-feladas.html">Fuvar feladása</a></div>
+</div>
+<div class="hero-card card">
+<h2>Gyors kereső</h2>
+<form id="quickSearchForm" class="form-stack">
+<label><span>Indulás</span><input id="quickOrigin" placeholder="pl. Nyíregyháza"></label>
+<label><span>Érkezés</span><input id="quickDestination" placeholder="pl. Budapest"></label>
+<label><span>Dátum</span><input id="quickDate" type="date"></label>
+<button class="btn btn-primary" type="submit">Keresés</button>
+</form>
+</div></section>
+<section class="section">
+<div class="section-head"><div><span class="eyebrow">Kiemelt fuvarok</span><h2 style="margin:14px 0 0;font-size:2.3rem">Legfrissebb indulások</h2></div></div>
+<div id="featuredTrips" class="cards"></div>
+</section>
+<section class="section footer"><div class="container footer-grid"><div><strong data-brand>Utazz Velem</strong><p>Fuvarmegosztó felület utasoknak és sofőröknek.</p></div><div><div>E-mail: <span data-setting="email"></span></div><div>Telefon: <span data-setting="phone"></span></div><div>Város: <span data-setting="city"></span></div></div></div></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="js/config.js"></script><script src="js/supabase-client.js"></script><script src="js/auth.js"></script><script src="js/app.js"></script>
+</body></html>
