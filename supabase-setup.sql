@@ -11,7 +11,7 @@ create table if not exists beallitasok (
 );
 
 insert into beallitasok (id, site_name, company_name, contact_email, contact_phone, city, admin_email, description)
-values (1, 'Utazz Velem', 'Utazz Velem', 'info@utazzvelem.hu', '+36 30 123 4567', 'Budapest', 'cegweb26@gmail.com', 'Gyors és biztonságos fuvarmegosztó felület utasoknak és sofőröknek.')
+values (1, 'Utazz Velünk', 'Utazz Velünk', 'info@utazzvelunk.hu', '+36 30 123 4567', 'Budapest', 'cegweb26@gmail.com', 'Gyors és biztonságos fuvarmegosztó felület utasoknak és sofőröknek.')
 on conflict (id) do update set admin_email = excluded.admin_email;
 
 create table if not exists fuvarok (
