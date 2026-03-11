@@ -101,7 +101,15 @@ const App = (() => {
     const total = Number(trip.auto_helyek ?? trip.osszes_hely ?? trip.helyek ?? 0);
     const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['barion','cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
     const rating = trip.sofor_ertekeles || 4.9;
-    const profile = `<div class="driver-mini"><strong>${escapeHtml(trip.nev || '')}</strong><span>${starRating(rating)}</span></div>`;
+    const driverName = getDisplayNameFromTrip(trip);
+    const profile = `
+      <div class="driver-mini">
+        ${avatarMarkup(driverName, trip.sofor_kep || '')}
+        <div class="driver-mini-text">
+          <strong>${escapeHtml(driverName)}</strong>
+          <span>${roleBadgeFromTrip(trip)} • ${starRating(rating)}</span>
+        </div>
+      </div>`;
     return `
       <article class="card trip-card" data-trip-id="${trip.id}">
         <div class="trip-main">
@@ -129,7 +137,7 @@ const App = (() => {
             <p style="margin:8px 0 0;color:var(--muted)">Térkép, külön fuvaroldal és Facebook-poszt kép.</p>
             <div class="inline-pills" style="margin-top:12px">
               <button class="btn btn-ghost js-map-focus" data-origin="${escapeHtml(trip.indulas)}" data-destination="${escapeHtml(trip.erkezes)}">Térkép</button>
-              <button class="btn btn-ghost js-share-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}'>Megosztás</button>
+              <button class="btn btn-ghost js-share-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}'>Facebook-poszt kép</button>
               <a class="btn btn-ghost" href="trip.html?id=${trip.id}">Részletek</a>
             </div>
           </div>
@@ -217,19 +225,84 @@ const App = (() => {
   }
 
   function shareCanvasDataUrl(trip) {
-    const c = document.createElement('canvas'); c.width = 1200; c.height = 630;
+    const c = document.createElement('canvas');
+    c.width = 1200; c.height = 630;
     const ctx = c.getContext('2d');
-    const g = ctx.createLinearGradient(0,0,1200,630); g.addColorStop(0,'#0d1d39'); g.addColorStop(1,'#10254a');
-    ctx.fillStyle = g; ctx.fillRect(0,0,1200,630);
-    ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(48,48,1104,534);
-    ctx.fillStyle = '#eef4ff'; ctx.font = 'bold 68px Arial';
-    ctx.fillText(`${trip.indulas} → ${trip.erkezes}`, 72, 170);
-    ctx.font = '36px Arial'; ctx.fillStyle = '#dbe8ff';
-    ctx.fillText(`${trip.datum} • ${trip.ido}`, 72, 245);
-    ctx.fillText(`${fmtCurrency(trip.ar)} Ft / fő`, 72, 300);
-    ctx.fillText(`${trip.szabad_helyek ?? trip.helyek ?? 0} szabad hely`, 72, 355);
-    ctx.font = '30px Arial'; ctx.fillStyle = '#b8c9ea';
-    ctx.fillText(APP_CONFIG.brandName + ' • Foglalás: ' + APP_CONFIG.siteUrl, 72, 560);
+
+    const bg = ctx.createLinearGradient(0, 0, 1200, 630);
+    bg.addColorStop(0, '#08162f');
+    bg.addColorStop(0.55, '#0c2346');
+    bg.addColorStop(1, '#13356b');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    ctx.beginPath(); ctx.roundRect(42, 42, 1116, 546, 28); ctx.fill();
+
+    ctx.fillStyle = '#66a4ff';
+    ctx.beginPath(); ctx.roundRect(72, 70, 210, 44, 999); ctx.fill();
+    ctx.fillStyle = '#eef4ff';
+    ctx.font = '700 24px Arial';
+    ctx.fillText(APP_CONFIG.brandName, 102, 99);
+
+    ctx.fillStyle = '#eef4ff';
+    ctx.font = '700 68px Arial';
+    wrapCanvasText(ctx, `${trip.indulas} → ${trip.erkezes}`, 72, 190, 760, 78, 2);
+
+    ctx.fillStyle = '#d9e7ff';
+    ctx.font = '600 28px Arial';
+    ctx.fillText(`${trip.datum || ''} • ${trip.ido || ''}`, 72, 300);
+
+    const total = Number(trip.osszes_hely ?? trip.auto_helyek ?? trip.helyek ?? 0);
+    const free = Number(trip.szabad_helyek ?? trip.helyek ?? 0);
+    const price = `${fmtCurrency(trip.ar)} Ft / fő`;
+
+    const stats = [
+      ['Ár', price],
+      ['Szabad hely', `${free}/${total || free}`],
+      ['Autó', trip.auto_tipus || 'Személyautó']
+    ];
+    let sx = 72;
+    stats.forEach(([label, value]) => {
+      ctx.fillStyle = 'rgba(255,255,255,.08)';
+      ctx.beginPath(); ctx.roundRect(sx, 338, 190, 92, 22); ctx.fill();
+      ctx.fillStyle = '#9ebdf1';
+      ctx.font = '600 20px Arial';
+      ctx.fillText(label, sx + 20, 372);
+      ctx.fillStyle = '#eef4ff';
+      ctx.font = '700 28px Arial';
+      ctx.fillText(String(value), sx + 20, 406);
+      sx += 210;
+    });
+
+    ctx.fillStyle = 'rgba(102,164,255,.14)';
+    ctx.beginPath(); ctx.roundRect(780, 82, 310, 310, 28); ctx.fill();
+    ctx.fillStyle = '#eef4ff';
+    ctx.font = '700 32px Arial';
+    ctx.fillText('Sofőr', 812, 128);
+    ctx.font = '700 40px Arial';
+    wrapCanvasText(ctx, getDisplayNameFromTrip(trip), 812, 186, 240, 46, 2);
+    ctx.fillStyle = '#d9e7ff';
+    ctx.font = '600 24px Arial';
+    ctx.fillText(`Értékelés: ${starRating(trip.sofor_ertekeles || 4.9)}`, 812, 278);
+    ctx.fillText(`Kapcsolat: ${trip.email || 'foglalás után'}`, 812, 320);
+
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    ctx.beginPath(); ctx.roundRect(72, 474, 560, 74, 20); ctx.fill();
+    ctx.fillStyle = '#b8c9ea';
+    ctx.font = '600 24px Arial';
+    wrapCanvasText(ctx, trip.megjegyzes || 'Foglalás csak regisztráció után. Fizetés közvetlenül a sofőrnek.', 92, 518, 520, 30, 2);
+
+    ctx.fillStyle = '#66a4ff';
+    ctx.beginPath(); ctx.roundRect(780, 446, 294, 70, 18); ctx.fill();
+    ctx.fillStyle = '#eef4ff';
+    ctx.font = '700 28px Arial';
+    ctx.fillText('Foglalás a weboldalon', 828, 489);
+
+    ctx.fillStyle = '#9ebdf1';
+    ctx.font = '600 24px Arial';
+    ctx.fillText(APP_CONFIG.siteUrl.replace(/^https?:\/\//,''), 782, 568);
+
     return c.toDataURL('image/png');
   }
 
@@ -276,6 +349,7 @@ const App = (() => {
       user_id: user?.id || null,
       nev: fd.get('driverName')?.toString().trim() || '',
       email: user?.email || fd.get('contactEmail')?.toString().trim() || '',
+      sofor_kep: user?.user_metadata?.avatar_url || user?.user_metadata?.picture || '',
       telefon: fd.get('phone')?.toString().trim() || '',
       indulas: fd.get('origin')?.toString().trim() || '',
       erkezes: fd.get('destination')?.toString().trim() || '',
@@ -539,7 +613,7 @@ const App = (() => {
       const msg = document.getElementById('registerMsg');
       msg.textContent = 'Regisztráció...';
       const { error } = await AppAuth.signUp(fd.get('email'), fd.get('password'), fd.get('name'));
-      msg.textContent = error ? (error.message || 'Nem sikerült a regisztráció.') : 'Sikeres regisztráció. Ellenőrizd az emailedet, majd erősítsd meg a fiókot.';
+      msg.textContent = error ? (error.message || 'Nem sikerült a regisztráció.') : 'Sikeres regisztráció. Ellenőrizd az emailedet, majd erősítsd meg a fiókot, utána már foglalhatsz és fuvart is hirdethetsz.';
     });
   }
 
@@ -648,7 +722,8 @@ const App = (() => {
     try {
       const trip = await fetchTripById(id);
       if (!trip) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
-      wrap.innerHTML = tripCard(trip, false) + `<section class="card detail-extra"><h2>Sofőr profil</h2><p><strong>${escapeHtml(trip.nev || '')}</strong></p><p>${starRating(trip.sofor_ertekeles || 4.9)}</p><p>Kapcsolat: ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p></section>`;
+      const driverName = getDisplayNameFromTrip(trip);
+      wrap.innerHTML = tripCard(trip, false) + `<section class="card detail-extra"><h2>Sofőr profil</h2><div class="driver-profile-line">${avatarMarkup(driverName, trip.sofor_kep || '')}<div><p><strong>${escapeHtml(driverName)}</strong></p><p>${roleBadgeFromTrip(trip)} • ${starRating(trip.sofor_ertekeles || 4.9)}</p><p>Kapcsolat: ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p></div></div></section>`;
       await focusRoute(trip.indulas, trip.erkezes);
     } catch (_) {
       wrap.innerHTML = '<div class="empty-state">A fuvar betöltése nem sikerült.</div>';

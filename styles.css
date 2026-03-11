@@ -189,3 +189,22 @@ input:focus,textarea:focus,select:focus{border-color:rgba(102,164,255,.65); box-
 .nav-user{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(102,164,255,.28);background:rgba(102,164,255,.10);color:#dce9ff;border-radius:999px;padding:12px 16px;line-height:1;font-weight:800;min-height:44px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .auth-status{position:fixed;right:18px;top:94px;z-index:120;background:rgba(17,42,85,.98);border:1px solid rgba(102,164,255,.28);box-shadow:var(--shadow);color:#eef4ff;padding:12px 16px;border-radius:14px;max-width:min(340px, calc(100% - 36px))}
 .nav nav button{cursor:pointer}
+
+
+.user-chip-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;display:inline-block;border:1px solid rgba(255,255,255,.16)}
+.user-chip-avatar-fallback,.mini-avatar-fallback{display:inline-flex;align-items:center;justify-content:center;background:rgba(102,164,255,.18);color:#eef4ff;font-weight:800}
+.user-chip-text{display:flex;flex-direction:column;line-height:1.05;min-width:0}
+.user-chip-text strong{font-size:.92rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-chip-text small{font-size:.7rem;color:#b8c7e6;text-transform:uppercase;letter-spacing:.04em}
+.nav-user{gap:10px;justify-content:flex-start;max-width:280px;padding:8px 14px}
+
+.driver-mini{display:flex;align-items:center;gap:12px}
+.driver-mini .mini-avatar{width:46px;height:46px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,.16)}
+.driver-mini-text{display:flex;flex-direction:column;gap:4px}
+.driver-mini-text strong{font-size:1rem}
+.driver-mini-text span{color:#b8c7e6;font-size:.92rem}
+.role-badge{display:inline-flex;align-items:center;justify-content:center;padding:4px 9px;border-radius:999px;background:rgba(102,164,255,.14);border:1px solid rgba(102,164,255,.25);color:#dbe8ff;font-size:.78rem;font-weight:700}
+.driver-profile-line{display:flex;gap:14px;align-items:center}
+.driver-profile-line p{margin:4px 0}
+
+.trip-card .btn.btn-ghost{min-width:140px}

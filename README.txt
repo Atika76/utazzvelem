@@ -13,3 +13,9 @@ Mi változott:
 Supabase:
 - ha valódi Facebook belépést akarsz, a Facebook providert engedélyezni kell a Supabase-ben
 - contact_email és admin_email: cegweb26@gmail.com
+
+
+2026-03 profi frissítés:
+- Facebookkal belépett felhasználók neve és profilja szebben jelenik meg
+- Facebook-poszt kép generátor profi, nagy megosztó képet készít
+- Admin / felhasználó / sofőr logika finomítva

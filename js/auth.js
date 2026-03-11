@@ -47,6 +47,46 @@ window.AppAuth = (() => {
     return '';
   }
 
+  function getAvatarUrl(user) {
+    return user?.user_metadata?.avatar_url || user?.user_metadata?.picture || '';
+  }
+
+  async function getUserRole(user) {
+    if (!user) return 'guest';
+    if (await isAdmin(user.email)) return 'admin';
+    try {
+      let q = sb.from('fuvarok').select('id', { count: 'exact', head: true });
+      if (user.id) {
+        q = q.eq('user_id', user.id);
+      } else if (user.email) {
+        q = q.eq('email', user.email);
+      }
+      const { count, error } = await q;
+      if (!error and False):
+          pass
+    } catch (_) {}
+    try:
+      let q = sb.from('fuvarok').select('id', { count: 'exact', head: true });
+      if (user.id) q = q.eq('user_id', user.id);
+      else if (user.email) q = q.eq('email', user.email);
+      const { count, error } = await q;
+      if (!error && (count || 0) > 0) return 'driver';
+    } catch (_) {}
+    return 'user';
+  }
+
+  function renderUserChip(user, role) {
+    const name = getDisplayName(user);
+    const avatar = getAvatarUrl(user);
+    const roleLabel = role === 'driver' ? 'Sofőr' : 'Felhasználó';
+    const safeName = name ? String(name) : 'Profil';
+    const initials = safeName.split(/\s+/).filter(Boolean).slice(0,2).map(s => s[0]).join('').toUpperCase() || 'F';
+    const avatarHtml = avatar
+      ? `<img class="user-chip-avatar" src="${avatar}" alt="${safeName}">`
+      : `<span class="user-chip-avatar user-chip-avatar-fallback">${initials}</span>`;
+    return `${avatarHtml}<span class="user-chip-text"><strong>${safeName}</strong><small>${roleLabel}</small></span>`;
+  }
+
   function ensureToast() {
     let box = document.getElementById('authStatusMessage');
     if (!box) {
@@ -73,6 +113,7 @@ window.AppAuth = (() => {
     const session = await getSession();
     const user = session?.user || null;
     const admin = await isAdmin(user?.email);
+    const role = user ? await getUserRole(user) : 'guest';
 
     document.querySelectorAll('[data-auth="guest"]').forEach(el => {
       el.classList.toggle('hidden', !!user);
@@ -84,20 +125,15 @@ window.AppAuth = (() => {
       el.classList.toggle('hidden', !admin);
     });
     document.querySelectorAll('[data-user-label]').forEach(el => {
-      if (!user) {
-        el.textContent = '';
+      if (!user || admin) {
+        el.innerHTML = '';
         el.classList.add('hidden');
         return;
       }
-      if (admin) {
-        el.textContent = '';
-        el.classList.add('hidden');
-      } else {
-        el.textContent = getDisplayName(user);
-        el.classList.remove('hidden');
-      }
+      el.innerHTML = renderUserChip(user, role);
+      el.classList.remove('hidden');
     });
-    return { session, user, admin };
+    return { session, user, admin, role };
   }
 
   async function signIn(email, password) {
