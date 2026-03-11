@@ -89,8 +89,13 @@ window.AppAuth = (() => {
         el.classList.add('hidden');
         return;
       }
-      el.textContent = admin ? 'Admin' : getDisplayName(user);
-      el.classList.remove('hidden');
+      if (admin) {
+        el.textContent = '';
+        el.classList.add('hidden');
+      } else {
+        el.textContent = getDisplayName(user);
+        el.classList.remove('hidden');
+      }
     });
     return { session, user, admin };
   }

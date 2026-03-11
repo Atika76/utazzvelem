@@ -43,15 +43,16 @@ const App = (() => {
 
   async function applySettings() {
     const s = await fetchSettings();
-    const publicBrand = 'FuvarVelünk';
-    const publicEmail = 'info@fuvarvelunk.hu';
-    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = publicBrand);
-    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = publicBrand);
-    document.querySelectorAll('[data-setting="email"]').forEach(el => el.textContent = publicEmail);
+    const visibleBrand = APP_CONFIG.brandName;
+    const visibleCompany = APP_CONFIG.companyName;
+    const visibleEmail = (s?.contact_email && !String(s.contact_email).includes('utazz')) ? s.contact_email : APP_CONFIG.contactEmail;
+    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = visibleBrand);
+    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = visibleCompany);
+    document.querySelectorAll('[data-setting="email"]').forEach(el => el.textContent = visibleEmail);
     document.querySelectorAll('[data-setting="phone"]').forEach(el => el.textContent = s?.contact_phone || APP_CONFIG.contactPhone);
     document.querySelectorAll('[data-setting="city"]').forEach(el => el.textContent = s?.city || APP_CONFIG.city);
     document.querySelectorAll('[data-setting="adminEmail"]').forEach(el => el.textContent = s?.admin_email || APP_CONFIG.adminEmail);
-    document.querySelectorAll('[data-brand]').forEach(el => el.textContent = publicBrand);
+    document.querySelectorAll('[data-brand]').forEach(el => el.textContent = visibleBrand);
   }
 
   async function fetchApprovedTrips(filters={}) {
@@ -140,7 +141,7 @@ const App = (() => {
             <button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Törlés</button>
           ` : `
             <button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${free < 1 ? 'disabled' : ''}>${free < 1 ? 'Betelt' : 'Foglalás'}</button>
-            <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || "")}&driverEmail=${encodeURIComponent(trip.email || "")}">Kérdés a sofőrnek</a>
+            <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>
           `}
         </div>
       </article>`;
@@ -237,12 +238,12 @@ const App = (() => {
     const text = `${trip.indulas} → ${trip.erkezes} | ${trip.datum} ${trip.ido} | ${fmtCurrency(trip.ar)} Ft / fő`;
     const dataUrl = shareCanvasDataUrl(trip);
     const blob = await (await fetch(dataUrl)).blob();
-    const file = new File([blob], 'utazzvelem-poszt.png', { type:'image/png' });
+    const file = new File([blob], 'fuvarvelunk-poszt.png', { type:'image/png' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })) {
       try { await navigator.share({ title: APP_CONFIG.brandName, text, url, files:[file] }); return; } catch(_) {}
     }
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-    const a = document.createElement('a'); a.href = dataUrl; a.download = 'utazzvelem-poszt.png'; a.click();
+    const a = document.createElement('a'); a.href = dataUrl; a.download = 'fuvarvelunk-poszt.png'; a.click();
   }
 
   function openModal(html) {
@@ -288,7 +289,7 @@ const App = (() => {
       ar: Number(fd.get('price') || 0),
       megjegyzes: fd.get('note')?.toString().trim() || '',
       statusz: 'Függőben',
-      fizetesi_modok: payment.length ? payment : ['transfer','cash'],
+      fizetesi_modok: payment.length ? payment : ['cash'],
       sofor_ertekeles: 5
     };
     const { error } = await sb.from(tableTrips).insert([payload]);
@@ -316,8 +317,8 @@ const App = (() => {
       telefon: phone,
       foglalt_helyek: seats,
       fizetesi_mod: method,
-      fizetesi_allapot: method === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás választva',
-      foglalasi_allapot: method === 'cash' ? 'Jóváhagyva' : 'Visszajelzésre vár',
+      fizetesi_allapot: method === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek',
+      foglalasi_allapot: method === 'cash' ? 'Jóváhagyva' : 'Fizetésre vár',
       megjegyzes: note,
       utas_email: userEmail,
       utas_nev: fd.get('name')?.toString().trim() || ''
@@ -368,10 +369,10 @@ const App = (() => {
               <label><span>Foglalt helyek</span><input name="seats" type="number" min="1" max="${trip.szabad_helyek ?? trip.helyek}" value="1" required></label>
             </div>
             <div class="grid-2">
-              <label><span>Fizetési mód</span><select name="paymentMethod"><option value="transfer">Utalás a sofőrnek</option><option value="cash">Készpénz a sofőrnek</option></select></label>
-              <label><span>Megjegyzés</span><input name="note" placeholder="pl. 1 nagy táska"></label>
+              <label><span>Fizetési mód</span><select name="paymentMethod"><option value="barion">Utalás a sofőrnek</option><option value="cash">Készpénz a sofőrnek</option></select></label>
+              <label><span>Megjegyzés</span><input name="note" placeholder="pl. 1 nagy bőrönd"></label>
             </div>
-            <div class="notice warn">Bankkártyás fizetéshez a Barion kereskedői kulcs és szerveroldali callback még szükséges. Készpénzes foglalásnál a rendszer azonnal lefoglalja a helyet.</div>
+            <div class="notice warn">A fizetés nem a weboldalon keresztül történik. Utalással a sofőrnek vagy készpénzben a sofőrnek tudsz fizetni.</div>
             <div class="form-message" id="bookingMsg"></div>
             <button class="btn btn-primary" type="submit">Foglalás rögzítése</button>
           </form>
@@ -381,7 +382,7 @@ const App = (() => {
           const msg = wrap.querySelector('#bookingMsg'); msg.textContent = 'Mentés...';
           try {
             const booking = await submitBooking(trip, ev.currentTarget);
-            msg.textContent = booking.fizetesi_mod === 'cash' ? 'Sikeres foglalás. A hely lefoglalva.' : 'Foglalás rögzítve. A Barion fizetéshez még a kereskedői bekötés kell.';
+            msg.textContent = booking.fizetesi_mod === 'cash' ? 'Sikeres foglalás. A hely igényed rögzítve lett.' : 'Foglalás rögzítve. A fizetés a sofőrrel egyeztetve történik.';
             msg.className = 'form-message';
             setTimeout(() => location.reload(), 1000);
           } catch(err) { msg.textContent = err.message || 'Nem sikerült a foglalás.'; }
@@ -551,9 +552,9 @@ const App = (() => {
     const msg = document.getElementById('settingsMsg');
     const settings = await fetchSettings();
     if (settingsForm) {
-      settingsForm.siteName.value = settings?.site_name || APP_CONFIG.brandName;
-      settingsForm.companyName.value = settings?.company_name || APP_CONFIG.companyName;
-      settingsForm.email.value = settings?.contact_email || APP_CONFIG.contactEmail;
+      settingsForm.siteName.value = APP_CONFIG.brandName;
+      settingsForm.companyName.value = APP_CONFIG.companyName;
+      settingsForm.email.value = (settings?.contact_email && !String(settings.contact_email).includes('utazz')) ? settings.contact_email : APP_CONFIG.contactEmail;
       settingsForm.phone.value = settings?.contact_phone || APP_CONFIG.contactPhone;
       settingsForm.city.value = settings?.city || APP_CONFIG.city;
       settingsForm.adminEmail.value = settings?.admin_email || APP_CONFIG.adminEmail;
@@ -591,13 +592,51 @@ const App = (() => {
 
   async function initContactPage() {
     const form = document.getElementById('contactForm');
-    if (!form) return;
-    form.addEventListener('submit', (e) => {
+    const driverForm = document.getElementById('driverQuestionForm');
+    const params = new URLSearchParams(location.search);
+
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        const subject = encodeURIComponent('Weboldal kérdés / hibajelzés - FuvarVelünk');
+        const body = encodeURIComponent(`Név: ${fd.get('name')}\nE-mail: ${fd.get('email')}\n\nÜzenet:\n${fd.get('message')}`);
+        location.href = `mailto:${APP_CONFIG.contactEmail}?subject=${subject}&body=${body}`;
+      });
+    }
+
+    if (!driverForm) return;
+
+    const session = await AppAuth.getSession();
+    if (session?.user?.email) {
+      const emailInput = driverForm.querySelector('[name="email"]');
+      if (emailInput) emailInput.value = session.user.email;
+      const nameInput = driverForm.querySelector('[name="name"]');
+      if (nameInput && !nameInput.value) {
+        nameInput.value = session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email.split('@')[0];
+      }
+    }
+
+    driverForm.querySelector('[name="tripId"]').value = params.get('tripId') || '';
+    driverForm.querySelector('[name="driverName"]').value = params.get('driverName') || '';
+    driverForm.querySelector('[name="driverEmail"]').value = params.get('driverEmail') || '';
+
+    driverForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const fd = new FormData(form);
-      const subject = encodeURIComponent('Üzenet a FuvarVelünk weboldalról');
-      const body = encodeURIComponent(`Név: ${fd.get('name')}\nE-mail: ${fd.get('email')}\n\nÜzenet:\n${fd.get('message')}`);
-      location.href = `mailto:${APP_CONFIG.contactEmail}?subject=${subject}&body=${body}`;
+      const msg = document.getElementById('driverQuestionMsg');
+      const ok = await AppAuth.requireAuth('kapcsolat.html');
+      if (!ok) return;
+      const fd = new FormData(driverForm);
+      const subject = encodeURIComponent(`Kérdés a sofőrnek - ${fd.get('driverName') || ''}`);
+      const body = encodeURIComponent(
+        `Fuvar azonosító: ${fd.get('tripId') || '-'}\n` +
+        `Feladó neve: ${fd.get('name')}\n` +
+        `Feladó e-mail: ${fd.get('email')}\n\n` +
+        `Üzenet:\n${fd.get('message')}`
+      );
+      const driverEmail = fd.get('driverEmail') || APP_CONFIG.contactEmail;
+      msg.textContent = 'Megnyílik az üzenet küldése...';
+      location.href = `mailto:${driverEmail}?subject=${subject}&body=${body}`;
     });
   }
 
