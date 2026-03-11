@@ -116,10 +116,18 @@ window.AppAuth = (() => {
   }
 
   async function signInWithFacebook() {
-    return sb.auth.signInWithOAuth({
+    const { data, error } = await sb.auth.signInWithOAuth({
       provider: 'facebook',
-      options: { redirectTo: APP_CONFIG.siteUrl + 'belepes.html' }
+      options: {
+        redirectTo: APP_CONFIG.siteUrl + 'belepes.html',
+        skipBrowserRedirect: true
+      }
     });
+    if (error) throw error;
+    if (data?.url) {
+      window.location.assign(data.url);
+    }
+    return { data, error: null };
   }
 
   async function logout() {
@@ -184,7 +192,12 @@ window.AppAuth = (() => {
         await signInWithFacebook();
       } catch (err) {
         console.error('Facebook belépési hiba:', err);
-        if (loginMsg) loginMsg.textContent = 'Nem sikerült a Facebook belépés.';
+        if (loginMsg) {
+          const msg = String(err?.message || '');
+          loginMsg.textContent = msg.toLowerCase().includes('provider')
+            ? 'A Facebook belépés még nincs bekapcsolva a Supabase-ben. Előbb engedélyezni kell a Facebook providert.'
+            : 'Nem sikerült a Facebook belépés.';
+        }
       }
     });
   }

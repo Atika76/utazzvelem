@@ -1,19 +1,15 @@
-FuvarVelünk – véglegesített csomag
+FuvarVelünk – frissített csomag
 
-Javítások:
-- márkanév mindenhol: FuvarVelünk
-- domain: fuvarvelunk.hu
-- dupla Admin menüpont megszüntetve
-- adminként csak 1 db Admin link látszik
-- foglalás csak bejelentkezve
-- fuvarfeladás csak bejelentkezve
-- kapcsolat oldalon:
-  - weboldal kérdés / hibabejelentés
-  - kérdés a sofőrnek
-- fizetés közvetlenül a sofőrnek:
+Mi változott:
+- kapcsolati e-mail: cegweb26@gmail.com
+- Facebook belépés gomb javítva:
+  - ha a Facebook provider be van kapcsolva a Supabase-ben, átirányít a Facebook belépésre
+  - ha nincs bekapcsolva, nem nyit hibás JSON oldalt, hanem érthető hibaüzenetet mutat
+- Facebook-poszt kép generálás finomítva
+- fizetés továbbra is közvetlenül a sofőrnek:
   - utalás a sofőrnek
   - készpénz a sofőrnek
 
 Supabase:
-- admin email: cegweb26@gmail.com
-- site_name / company_name: FuvarVelünk
+- ha valódi Facebook belépést akarsz, a Facebook providert engedélyezni kell a Supabase-ben
+- contact_email és admin_email: cegweb26@gmail.com

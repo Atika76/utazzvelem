@@ -229,13 +229,13 @@ const App = (() => {
     ctx.fillText(`${fmtCurrency(trip.ar)} Ft / fő`, 72, 300);
     ctx.fillText(`${trip.szabad_helyek ?? trip.helyek ?? 0} szabad hely`, 72, 355);
     ctx.font = '30px Arial'; ctx.fillStyle = '#b8c9ea';
-    ctx.fillText(APP_CONFIG.brandName + ' • ' + APP_CONFIG.siteUrl, 72, 560);
+    ctx.fillText(APP_CONFIG.brandName + ' • Foglalás: ' + APP_CONFIG.siteUrl, 72, 560);
     return c.toDataURL('image/png');
   }
 
   async function shareTrip(trip) {
     const url = APP_CONFIG.siteUrl + 'trip.html?id=' + trip.id;
-    const text = `${trip.indulas} → ${trip.erkezes} | ${trip.datum} ${trip.ido} | ${fmtCurrency(trip.ar)} Ft / fő`;
+    const text = `${trip.indulas} → ${trip.erkezes} | ${trip.datum} ${trip.ido} | ${fmtCurrency(trip.ar)} Ft / fő | Foglalás: ${APP_CONFIG.siteUrl}`;
     const dataUrl = shareCanvasDataUrl(trip);
     const blob = await (await fetch(dataUrl)).blob();
     const file = new File([blob], 'fuvarvelunk-poszt.png', { type:'image/png' });
