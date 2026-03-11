@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://fuvarvelunk.hu/sitemap.xml
+Sitemap: https://utazzvelunk.hu/sitemap.xml
