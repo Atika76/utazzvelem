@@ -591,9 +591,95 @@ const App = (() => {
     } catch (e) { bookingsWrap.innerHTML = '<div class="empty-state">A foglalások betöltése nem sikerült.</div>'; }
   }
 
+
+  async function initDriverPage(){
+    const box = document.getElementById('driverProfileCard');
+    if (!box) return;
+    const params = new URLSearchParams(location.search);
+    const email = params.get('email');
+    const name = params.get('name');
+    const allTrips = await fetchTrips().catch(() => []);
+    const trips = allTrips.filter(t => (email && t.email === email) || (name && t.nev === name));
+    const trip = trips[0] || { nev: name || 'Ismeretlen sofőr', email: email || '', telefon: '', sofor_ertekeles: 4.9 };
+    const rating = getRatingValue(trip);
+    box.innerHTML = `
+      <div class="driver-avatar">${getInitials(trip.nev)}</div>
+      <div class="driver-meta">
+        <h2>${trip.nev || 'Ismeretlen sofőr'}</h2>
+        <div class="rating-stars">${getStars(rating)} <span style="color:#cddcff;letter-spacing:0">${rating.toFixed(1)}</span></div>
+        <p style="margin:10px 0 0">Kapcsolat: ${trip.email || '-'} ${trip.telefon ? '· ' + trip.telefon : ''}</p>
+        <p style="margin:8px 0 0">Aktív fuvarok száma: ${trips.length}</p>
+      </div>`;
+    const tripsBox = document.getElementById('driverTrips');
+    if (tripsBox){
+      tripsBox.innerHTML = trips.length ? trips.map(t => `
+        <article class="trip-card card">
+          <div class="eyebrow">${t.indulas || ''} → ${t.erkezes || ''}</div>
+          <h3>${t.indulas || ''} → ${t.erkezes || ''}</h3>
+          <p>${t.datum || ''} ${t.ido || ''} · ${t.ar || t.ar_ft || ''} Ft/fő</p>
+          <a class="btn btn-secondary" href="trip.html?id=${t.id}">Részletek</a>
+        </article>`).join('') : '<div class="notice">Ennél a sofőrnél még nincs aktív fuvar.</div>';
+    }
+    const contact = document.getElementById('driverContactBox');
+    if (contact) {
+      contact.innerHTML = `<strong>${trip.nev || 'Sofőr'}</strong><br>${trip.email || '-'}${trip.telefon ? '<br>' + trip.telefon : ''}`;
+    }
+  }
+
+  async function initTripEnhancements(trip){
+    const card = document.getElementById('tripDriverProfile');
+    if (card){
+      const rating = getRatingValue(trip);
+      card.innerHTML = `
+        <div class="driver-mini">
+          <div class="driver-avatar">${getInitials(trip.nev)}</div>
+          <div>
+            <strong>${trip.nev || 'Sofőr'}</strong><br>
+            <span class="rating-stars">${getStars(rating)}</span>
+            <span style="color:#cddcff">${rating.toFixed(1)}</span>
+          </div>
+        </div>
+        <div class="trip-tools">
+          <a class="btn btn-secondary" href="driver.html?name=${encodeURIComponent(trip.nev || '')}&email=${encodeURIComponent(trip.email || '')}">Sofőr profil</a>
+          <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>
+        </div>`;
+    }
+    const map = document.getElementById('routeMapFrame');
+    if (map){
+      map.src = buildGoogleMapsEmbedUrl(trip.indulas || '', trip.erkezes || '');
+    }
+    const openBtn = document.getElementById('openGoogleMaps');
+    if (openBtn){
+      openBtn.href = buildGoogleMapsDirectionsUrl(trip.indulas || '', trip.erkezes || '');
+    }
+    const imgBtn = document.getElementById('generateFacebookImage');
+    if (imgBtn){
+      imgBtn.addEventListener('click', async () => {
+        const dataUrl = await generateFacebookPostImage(trip);
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `fuvarvelunk-poszt-${trip.id || 'fuvar'}.png`;
+        a.click();
+      });
+    }
+    const shareBtn = document.getElementById('shareFacebookText');
+    if (shareBtn){
+      shareBtn.addEventListener('click', async () => {
+        const text = buildFacebookShareText(trip);
+        try{
+          await navigator.clipboard.writeText(text);
+          shareBtn.textContent = 'Szöveg vágólapra másolva';
+          setTimeout(() => shareBtn.textContent = 'Facebook szöveg másolása', 2200);
+        }catch(e){}
+      });
+    }
+  }
+
+
   async function initContactPage() {
     const form = document.getElementById('contactForm');
     const driverForm = document.getElementById('driverQuestionForm');
+    const driverSection = document.getElementById('driverQuestionSection');
     const params = new URLSearchParams(location.search);
 
     if (form) {
@@ -607,6 +693,7 @@ const App = (() => {
     }
 
     if (!driverForm) return;
+    if (driverSection) driverSection.style.display = params.get('driverEmail') || params.get('driverName') ? '' : 'none';
 
     const session = await AppAuth.getSession();
     if (session?.user?.email) {

@@ -189,3 +189,18 @@ input:focus,textarea:focus,select:focus{border-color:rgba(102,164,255,.65); box-
 .nav-user{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(102,164,255,.28);background:rgba(102,164,255,.10);color:#dce9ff;border-radius:999px;padding:12px 16px;line-height:1;font-weight:800;min-height:44px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .auth-status{position:fixed;right:18px;top:94px;z-index:120;background:rgba(17,42,85,.98);border:1px solid rgba(102,164,255,.28);box-shadow:var(--shadow);color:#eef4ff;padding:12px 16px;border-radius:14px;max-width:min(340px, calc(100% - 36px))}
 .nav nav button{cursor:pointer}
+
+
+.driver-profile-card{display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:center}
+.driver-avatar{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;font-size:2rem;font-weight:800;background:rgba(108,160,255,.18);border:1px solid rgba(255,255,255,.12)}
+.driver-meta h2{margin:0 0 8px;font-size:2rem}
+.rating-stars{letter-spacing:3px;color:#ffd56b;font-size:1.15rem}
+.route-map-card{margin-top:18px}
+.route-map-frame{width:100%;min-height:360px;border:0;border-radius:18px;background:#09152b}
+.driver-mini{display:flex;align-items:center;gap:10px;margin-top:10px}
+.driver-mini .driver-avatar{width:44px;height:44px;font-size:1rem}
+.trip-tools{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.trip-tools .btn{min-width:140px;text-align:center}
+@media (max-width: 860px){
+  .driver-profile-card{grid-template-columns:1fr}
+}

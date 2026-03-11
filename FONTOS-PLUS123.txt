@@ -1,0 +1,9 @@
+Mit kapott ez a verzió:
+1. Sofőr profil oldal értékeléssel
+2. Google Maps útvonal megjelenítés a részletek oldalon
+3. Profi Facebook-poszt kép generátor + másolható megosztási szöveg
+
+Kötelező:
+- futtasd le újra a supabase-setup.sql tartalmát
+- GitHubon írd felül a fájlokat
+- Ctrl+F5
