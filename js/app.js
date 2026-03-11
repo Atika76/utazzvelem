@@ -55,44 +55,20 @@ const App = (() => {
     document.querySelectorAll('[data-brand]').forEach(el => el.textContent = visibleBrand);
   }
 
-  function mapTrip(row={}) {
-    const status = row.statusz || row.status || row.allapot || row.approved_status || '';
-    const freeSeats = Number(row.szabad_helyek ?? row.helyek ?? row.szabadhely ?? row.elerheto_helyek ?? 0);
-    const totalSeats = Number(row.osszes_hely ?? row.auto_helyek ?? row.helyek ?? row.ferohely ?? row.ferohelyek ?? freeSeats);
-    return {
-      ...row,
-      statusz: status,
-      auto_tipus: row.auto_tipus || row.auto || row.autoTipus || '',
-      bankszamla: row.bankszamla || row.bank_account || row.szamlaszam || '',
-      szabad_helyek: freeSeats,
-      auto_helyek: totalSeats,
-      osszes_hely: totalSeats,
-    };
-  }
-
-  function sortTrips(list=[]) {
-    return [...list].sort((a,b) => `${a.datum || ''} ${a.ido || ''}`.localeCompare(`${b.datum || ''} ${b.ido || ''}`));
-  }
-
   async function fetchApprovedTrips(filters={}) {
-    const all = await fetchAllTrips();
-    const approved = all.filter(row => {
-      const s = normStatus(row.statusz || row.status || row.allapot || '');
-      return s.includes('jóvá') || s.includes('approved') || s.includes('aktiv') || s.includes('active');
-    });
-    return sortTrips(approved.filter(row => {
-      if (filters.origin && !String(row.indulas || '').toLowerCase().includes(String(filters.origin).toLowerCase())) return false;
-      if (filters.destination && !String(row.erkezes || '').toLowerCase().includes(String(filters.destination).toLowerCase())) return false;
-      if (filters.date && String(row.datum || '') !== String(filters.date)) return false;
-      return true;
-    }));
+    let q = sb.from(tableTrips).select('*').eq('statusz','Jóváhagyva').order('datum',{ascending:true}).order('ido',{ascending:true});
+    if (filters.origin) q = q.ilike('indulas', `%${filters.origin}%`);
+    if (filters.destination) q = q.ilike('erkezes', `%${filters.destination}%`);
+    if (filters.date) q = q.eq('datum', filters.date);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
   }
 
   async function fetchAllTrips() {
-    let result = await sb.from(tableTrips).select('*').order('created_at', {ascending:false});
-    if (result.error) result = await sb.from(tableTrips).select('*');
-    if (result.error) throw result.error;
-    return (result.data || []).map(mapTrip);
+    const { data, error } = await sb.from(tableTrips).select('*').order('created_at', {ascending:false});
+    if (error) throw error;
+    return data || [];
   }
 
   async function fetchTripById(id) {
@@ -289,36 +265,6 @@ const App = (() => {
     } catch (_) {}
   }
 
-
-  async function safeInsertTrip(payload) {
-    let current = { ...payload };
-    for (let i = 0; i < 8; i++) {
-      const { error } = await sb.from(tableTrips).insert([current]);
-      if (!error) return;
-      const msg = String(error.message || '');
-      const match = msg.match(/'([^']+)' column/);
-      if (match && current[match[1]] !== undefined) {
-        delete current[match[1]];
-        continue;
-      }
-      throw error;
-    }
-    throw new Error('Nem sikerült a fuvar mentése.');
-  }
-
-  async function safeUpdateTripStatus(id, approved=true) {
-    const updates = [
-      approved ? { statusz:'Jóváhagyva' } : { statusz:'Függőben' },
-      approved ? { status:'Jóváhagyva' } : { status:'Függőben' },
-      approved ? { allapot:'Jóváhagyva' } : { allapot:'Függőben' }
-    ];
-    for (const payload of updates) {
-      const { error } = await sb.from(tableTrips).update(payload).eq('id', id);
-      if (!error) return;
-    }
-    throw new Error('Nem sikerült módosítani a státuszt.');
-  }
-
   async function submitTrip(form) {
     const session = await AppAuth.getSession();
     const user = session?.user;
@@ -347,7 +293,8 @@ const App = (() => {
       bankszamla: fd.get('bankAccount')?.toString().trim() || '',
       sofor_ertekeles: 5
     };
-    await safeInsertTrip(payload);
+    const { error } = await sb.from(tableTrips).insert([payload]);
+    if (error) throw error;
     await notifyAdmin('uj_fuvar', payload);
   }
 
@@ -444,9 +391,9 @@ const App = (() => {
         return;
       }
       const approveTrip = e.target.closest('.js-trip-approve');
-      if (approveTrip) { await safeUpdateTripStatus(approveTrip.dataset.id, true); location.reload(); return; }
+      if (approveTrip) { await sb.from(tableTrips).update({ statusz:'Jóváhagyva' }).eq('id', approveTrip.dataset.id); location.reload(); return; }
       const pendingTrip = e.target.closest('.js-trip-pending');
-      if (pendingTrip) { await safeUpdateTripStatus(pendingTrip.dataset.id, false); location.reload(); return; }
+      if (pendingTrip) { await sb.from(tableTrips).update({ statusz:'Függőben' }).eq('id', pendingTrip.dataset.id); location.reload(); return; }
       const deleteTrip = e.target.closest('.js-trip-delete');
       if (deleteTrip) { if (confirm('Biztosan törlöd ezt a fuvart?')) { await sb.from(tableTrips).delete().eq('id', deleteTrip.dataset.id); location.reload(); } return; }
       const approveBooking = e.target.closest('.js-booking-approve');
@@ -659,10 +606,7 @@ const App = (() => {
       });
     }
 
-    const driverCard = document.getElementById('driverContactCard');
     if (!driverForm) return;
-    if (!params.get('tripId')) { if (driverCard) driverCard.classList.add('hidden'); return; }
-    if (driverCard) driverCard.classList.remove('hidden');
 
     const session = await AppAuth.getSession();
     if (session?.user?.email) {

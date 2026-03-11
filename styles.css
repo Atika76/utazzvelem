@@ -189,15 +189,3 @@ input:focus,textarea:focus,select:focus{border-color:rgba(102,164,255,.65); box-
 .nav-user{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(102,164,255,.28);background:rgba(102,164,255,.10);color:#dce9ff;border-radius:999px;padding:12px 16px;line-height:1;font-weight:800;min-height:44px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .auth-status{position:fixed;right:18px;top:94px;z-index:120;background:rgba(17,42,85,.98);border:1px solid rgba(102,164,255,.28);box-shadow:var(--shadow);color:#eef4ff;padding:12px 16px;border-radius:14px;max-width:min(340px, calc(100% - 36px))}
 .nav nav button{cursor:pointer}
-
-
-.trip-form-shell{display:grid;gap:18px}
-.trip-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
-.trip-form-grid > .trip-form-panel:last-child{grid-column:1 / -1}
-.trip-form-panel h2{margin:0 0 16px;font-size:1.3rem}
-.trip-form-grid-inner{display:grid;grid-template-columns:.9fr 1.1fr;gap:18px}
-.compact-grid{align-items:end}
-.payment-card{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.04);min-height:120px}
-.payment-option{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.03)}
-.payment-option input{width:18px;height:18px;min-height:auto}
-@media (max-width: 1040px){.trip-form-grid,.trip-form-grid-inner{grid-template-columns:1fr}.trip-form-grid > .trip-form-panel:last-child{grid-column:auto}}

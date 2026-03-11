@@ -1,0 +1,18 @@
+Ezt most kötelező lefuttatni a Supabase SQL Editorban:
+
+alter table if exists public.fuvarok add column if not exists auto_tipus text;
+alter table if exists public.fuvarok add column if not exists bankszamla text;
+alter table if exists public.fuvarok add column if not exists statusz text default 'Függőben';
+alter table if exists public.fuvarok add column if not exists auto_helyek integer;
+alter table if exists public.fuvarok add column if not exists osszes_hely integer;
+alter table if exists public.fuvarok add column if not exists fizetesi_modok text[];
+alter table if exists public.fuvarok add column if not exists sofor_ertekeles numeric default 5;
+alter table if exists public.fuvarok add column if not exists user_id uuid;
+alter table if exists public.fuvarok add column if not exists approved boolean default false;
+alter table if exists public.fuvarok add column if not exists created_at timestamptz default now();
+alter table if exists public.fuvarok add column if not exists updated_at timestamptz default now();
+
+create index if not exists idx_fuvarok_approved_created_at
+on public.fuvarok (approved, created_at desc);
+
+Ezután frissítsd az oldalt Ctrl+F5-tel.
