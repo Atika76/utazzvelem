@@ -52,3 +52,18 @@ begin
 end $$;
 
 alter table if exists public.fuvarok add column if not exists sofor_ertekeles numeric default 4.9;
+
+
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where schemaname='public' and tablename='fuvarok' and policyname='Fuvar törlés engedélyezése'
+  ) then
+    create policy "Fuvar törlés engedélyezése"
+    on public.fuvarok
+    for delete
+    to authenticated
+    using (true);
+  end if;
+end $$;

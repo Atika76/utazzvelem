@@ -1,0 +1,20 @@
+Most ezt is futtasd le a Supabase SQL Editorban:
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where schemaname='public' and tablename='fuvarok' and policyname='Fuvar törlés engedélyezése'
+  ) then
+    create policy "Fuvar törlés engedélyezése"
+    on public.fuvarok
+    for delete
+    to authenticated
+    using (true);
+  end if;
+end $$;
+
+Ezután Ctrl+F5.
+Ebben a ZIP-ben:
+- a láblécben csak az e-mail marad
+- a törlés javítva van
+- a saját hirdetés törlése a részletek oldalon is elérhető
