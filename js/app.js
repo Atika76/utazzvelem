@@ -43,13 +43,15 @@ const App = (() => {
 
   async function applySettings() {
     const s = await fetchSettings();
-    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = s?.site_name || APP_CONFIG.brandName);
-    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = s?.company_name || APP_CONFIG.companyName);
-    document.querySelectorAll('[data-setting="email"]').forEach(el => el.textContent = s?.contact_email || APP_CONFIG.contactEmail);
+    const publicBrand = 'FuvarVelünk';
+    const publicEmail = 'info@fuvarvelunk.hu';
+    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = publicBrand);
+    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = publicBrand);
+    document.querySelectorAll('[data-setting="email"]').forEach(el => el.textContent = publicEmail);
     document.querySelectorAll('[data-setting="phone"]').forEach(el => el.textContent = s?.contact_phone || APP_CONFIG.contactPhone);
     document.querySelectorAll('[data-setting="city"]').forEach(el => el.textContent = s?.city || APP_CONFIG.city);
     document.querySelectorAll('[data-setting="adminEmail"]').forEach(el => el.textContent = s?.admin_email || APP_CONFIG.adminEmail);
-    document.querySelectorAll('[data-brand]').forEach(el => el.textContent = s?.site_name || APP_CONFIG.brandName);
+    document.querySelectorAll('[data-brand]').forEach(el => el.textContent = publicBrand);
   }
 
   async function fetchApprovedTrips(filters={}) {
@@ -96,7 +98,7 @@ const App = (() => {
   function tripCard(trip, admin=false) {
     const free = Number(trip.szabad_helyek ?? trip.helyek ?? 0);
     const total = Number(trip.auto_helyek ?? trip.osszes_hely ?? trip.helyek ?? 0);
-    const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['transfer','cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
+    const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['barion','cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
     const rating = trip.sofor_ertekeles || 4.9;
     const profile = `<div class="driver-mini"><strong>${escapeHtml(trip.nev || '')}</strong><span>${starRating(rating)}</span></div>`;
     return `
@@ -117,7 +119,7 @@ const App = (() => {
           <div class="trip-contact">
             <div><strong>Sofőr:</strong> ${escapeHtml(trip.nev || '')}</div>
             <div><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</div>
-            <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>${trip.bankszamla ? `<div><strong>Bankszámla:</strong> ${escapeHtml(trip.bankszamla)}</div>` : ''}
+            <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>
           </div>
         </div>
         <div>
@@ -138,7 +140,7 @@ const App = (() => {
             <button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Törlés</button>
           ` : `
             <button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${free < 1 ? 'disabled' : ''}>${free < 1 ? 'Betelt' : 'Foglalás'}</button>
-            <a class="btn btn-secondary" href="kapcsolat.html?trip_id=${trip.id}&driver=${encodeURIComponent(trip.nev || "")}&driverEmail=${encodeURIComponent(trip.email || "")}">Kérdés a sofőrnek</a>
+            <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || "")}&driverEmail=${encodeURIComponent(trip.email || "")}">Kérdés a sofőrnek</a>
           `}
         </div>
       </article>`;
@@ -235,12 +237,12 @@ const App = (() => {
     const text = `${trip.indulas} → ${trip.erkezes} | ${trip.datum} ${trip.ido} | ${fmtCurrency(trip.ar)} Ft / fő`;
     const dataUrl = shareCanvasDataUrl(trip);
     const blob = await (await fetch(dataUrl)).blob();
-    const file = new File([blob], 'fuvarozz-velunk-poszt.png', { type:'image/png' });
+    const file = new File([blob], 'utazzvelem-poszt.png', { type:'image/png' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })) {
       try { await navigator.share({ title: APP_CONFIG.brandName, text, url, files:[file] }); return; } catch(_) {}
     }
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-    const a = document.createElement('a'); a.href = dataUrl; a.download = 'fuvarozz-velunk-poszt.png'; a.click();
+    const a = document.createElement('a'); a.href = dataUrl; a.download = 'utazzvelem-poszt.png'; a.click();
   }
 
   function openModal(html) {
@@ -283,11 +285,10 @@ const App = (() => {
       osszes_hely: totalSeats,
       auto_helyek: totalSeats,
       auto_tipus: fd.get('carType')?.toString().trim() || '',
-      bankszamla: fd.get('bankAccount')?.toString().trim() || '',
       ar: Number(fd.get('price') || 0),
       megjegyzes: fd.get('note')?.toString().trim() || '',
       statusz: 'Függőben',
-      fizetesi_modok: payment.length ? payment : ['cash'],
+      fizetesi_modok: payment.length ? payment : ['transfer','cash'],
       sofor_ertekeles: 5
     };
     const { error } = await sb.from(tableTrips).insert([payload]);
@@ -315,8 +316,8 @@ const App = (() => {
       telefon: phone,
       foglalt_helyek: seats,
       fizetesi_mod: method,
-      fizetesi_allapot: method === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás kiválasztva',
-      foglalasi_allapot: method === 'cash' ? 'Jóváhagyva' : 'Visszaigazolásra vár',
+      fizetesi_allapot: method === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás választva',
+      foglalasi_allapot: method === 'cash' ? 'Jóváhagyva' : 'Visszajelzésre vár',
       megjegyzes: note,
       utas_email: userEmail,
       utas_nev: fd.get('name')?.toString().trim() || ''
@@ -368,9 +369,9 @@ const App = (() => {
             </div>
             <div class="grid-2">
               <label><span>Fizetési mód</span><select name="paymentMethod"><option value="transfer">Utalás a sofőrnek</option><option value="cash">Készpénz a sofőrnek</option></select></label>
-              <label><span>Megjegyzés</span><input name="note" placeholder="pl. 1 nagy bőrönd"></label>
+              <label><span>Megjegyzés</span><input name="note" placeholder="pl. 1 nagy táska"></label>
             </div>
-            <div class="notice warn">A platform nem kezel online fizetést. Az utas közvetlenül a sofőrnek fizet: utalással vagy készpénzzel.</div>
+            <div class="notice warn">Bankkártyás fizetéshez a Barion kereskedői kulcs és szerveroldali callback még szükséges. Készpénzes foglalásnál a rendszer azonnal lefoglalja a helyet.</div>
             <div class="form-message" id="bookingMsg"></div>
             <button class="btn btn-primary" type="submit">Foglalás rögzítése</button>
           </form>
@@ -380,7 +381,7 @@ const App = (() => {
           const msg = wrap.querySelector('#bookingMsg'); msg.textContent = 'Mentés...';
           try {
             const booking = await submitBooking(trip, ev.currentTarget);
-            msg.textContent = booking.fizetesi_mod === 'cash' ? 'Sikeres foglalási igény. Fizetés készpénzben a sofőrnél.' : 'Sikeres foglalási igény. A sofőrrel egyeztessétek az utalást.';
+            msg.textContent = booking.fizetesi_mod === 'cash' ? 'Sikeres foglalás. A hely lefoglalva.' : 'Foglalás rögzítve. A Barion fizetéshez még a kereskedői bekötés kell.';
             msg.className = 'form-message';
             setTimeout(() => location.reload(), 1000);
           } catch(err) { msg.textContent = err.message || 'Nem sikerült a foglalás.'; }
@@ -400,7 +401,7 @@ const App = (() => {
         const free = Number(trip?.szabad_helyek ?? trip?.helyek ?? 0);
         if (trip && free >= seats) {
           await sb.from(tableTrips).update({ helyek: free - seats, szabad_helyek: free - seats }).eq('id', tripId);
-          await sb.from(tableBookings).update({ foglalasi_allapot:'Jóváhagyva', fizetesi_allapot:'Készpénz a helyszínen' }).eq('id', id);
+          await sb.from(tableBookings).update({ foglalasi_allapot:'Jóváhagyva', fizetesi_allapot:'Készpénz a sofőrnek' }).eq('id', id);
         }
         location.reload(); return;
       }
@@ -590,71 +591,13 @@ const App = (() => {
 
   async function initContactPage() {
     const form = document.getElementById('contactForm');
-    if (form) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const fd = new FormData(form);
-        const subject = encodeURIComponent('Üzenet a Fuvarozz Velünk oldalról');
-        const body = encodeURIComponent(`Név: ${fd.get('name')}
-E-mail: ${fd.get('email')}
-
-Üzenet:
-${fd.get('message')}`);
-        location.href = `mailto:${APP_CONFIG.contactEmail}?subject=${subject}&body=${body}`;
-      });
-    }
-
-    const driverForm = document.getElementById('driverQuestionForm');
-    if (!driverForm) return;
-
-    const params = new URLSearchParams(location.search);
-    const driver = params.get('driver') || '';
-    const driverEmail = params.get('driverEmail') || '';
-    const tripId = params.get('trip_id') || '';
-    const info = document.getElementById('driverQuestionInfo');
-
-    driverForm.driverName.value = driver;
-    driverForm.driverEmail.value = driverEmail;
-    driverForm.tripId.value = tripId;
-
-    const session = await AppAuth.getSession();
-    const user = session?.user;
-    if (user?.email) {
-      driverForm.querySelector('[name="email"]').value = user.email;
-      driverForm.querySelector('[name="name"]').value = user.user_metadata?.name || user.user_metadata?.full_name || user.email.split('@')[0];
-    }
-
-    if (driver || driverEmail) {
-      info?.classList.remove('hidden');
-      info.textContent = `Itt közvetlenül a kiválasztott sofőrnek tudsz írni${driver ? ': ' + driver : ''}.`;
-    }
-
-    driverForm.addEventListener('submit', async (e) => {
+    if (!form) return;
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const msg = document.getElementById('driverQuestionMsg');
-      const currentSession = await AppAuth.getSession();
-      if (!currentSession?.user) {
-        msg.textContent = 'A sofőrnek küldött kérdéshez előbb jelentkezz be.';
-        msg.className = 'form-message';
-        return;
-      }
-      const fd = new FormData(driverForm);
-      if (!fd.get('driverEmail')) {
-        msg.textContent = 'Nyisd meg ezt az oldalt egy konkrét fuvar részleteiről, hogy a sofőr adatai automatikusan kitöltődjenek.';
-        msg.className = 'form-message';
-        return;
-      }
-      const subject = encodeURIComponent(`Kérdés a fuvarról${fd.get('tripId') ? ' #' + fd.get('tripId') : ''}`);
-      const body = encodeURIComponent(`Saját név: ${fd.get('name')}
-Saját e-mail: ${fd.get('email')}
-Sofőr: ${fd.get('driverName')}
-Fuvar azonosító: ${fd.get('tripId') || '-'}
-
-Kérdés:
-${fd.get('message')}`);
-      location.href = `mailto:${fd.get('driverEmail')}?subject=${subject}&body=${body}`;
-      msg.textContent = 'Megnyílt az e-mail küldés a sofőr felé.';
-      msg.className = 'form-message';
+      const fd = new FormData(form);
+      const subject = encodeURIComponent('Üzenet a FuvarVelünk weboldalról');
+      const body = encodeURIComponent(`Név: ${fd.get('name')}\nE-mail: ${fd.get('email')}\n\nÜzenet:\n${fd.get('message')}`);
+      location.href = `mailto:${APP_CONFIG.contactEmail}?subject=${subject}&body=${body}`;
     });
   }
 
