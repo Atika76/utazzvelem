@@ -99,7 +99,7 @@ const App = (() => {
   function tripCard(trip, admin=false) {
     const free = Number(trip.szabad_helyek ?? trip.helyek ?? 0);
     const total = Number(trip.auto_helyek ?? trip.osszes_hely ?? trip.helyek ?? 0);
-    const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['barion','cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
+    const paymentMethods = (trip.fizetesi_modok && Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok : ['transfer','cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
     const rating = trip.sofor_ertekeles || 4.9;
     const profile = `<div class="driver-mini"><strong>${escapeHtml(trip.nev || '')}</strong><span>${starRating(rating)}</span></div>`;
     return `
@@ -120,7 +120,7 @@ const App = (() => {
           <div class="trip-contact">
             <div><strong>Sofőr:</strong> ${escapeHtml(trip.nev || '')}</div>
             <div><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</div>
-            <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>
+            <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>${trip.bankszamla ? `<div><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla)}</div>` : ''}
           </div>
         </div>
         <div>
@@ -271,7 +271,7 @@ const App = (() => {
     const fd = new FormData(form);
     const totalSeats = Number(fd.get('osszHely') || 0);
     const freeSeats = Number(fd.get('szabadHely') || totalSeats || 0);
-    const payment = Array.from(form.querySelectorAll('input[name="fizetesiMod"]:checked')).map(x => x.value);
+    const payment = Array.from(form.querySelectorAll('input[name="fizetesiMod"]:checked')).map(x => x.value === 'barion' ? 'transfer' : x.value);
     const payload = {
       user_id: user?.id || null,
       nev: fd.get('driverName')?.toString().trim() || '',
@@ -290,6 +290,7 @@ const App = (() => {
       megjegyzes: fd.get('note')?.toString().trim() || '',
       statusz: 'Függőben',
       fizetesi_modok: payment.length ? payment : ['cash'],
+      bankszamla: fd.get('bankAccount')?.toString().trim() || '',
       sofor_ertekeles: 5
     };
     const { error } = await sb.from(tableTrips).insert([payload]);
@@ -369,7 +370,7 @@ const App = (() => {
               <label><span>Foglalt helyek</span><input name="seats" type="number" min="1" max="${trip.szabad_helyek ?? trip.helyek}" value="1" required></label>
             </div>
             <div class="grid-2">
-              <label><span>Fizetési mód</span><select name="paymentMethod"><option value="barion">Utalás a sofőrnek</option><option value="cash">Készpénz a sofőrnek</option></select></label>
+              <label><span>Fizetési mód</span><select name="paymentMethod"><option value="transfer">Utalás a sofőrnek</option><option value="cash">Készpénz a sofőrnek</option></select></label>
               <label><span>Megjegyzés</span><input name="note" placeholder="pl. 1 nagy bőrönd"></label>
             </div>
             <div class="notice warn">A fizetés nem a weboldalon keresztül történik. Utalással a sofőrnek vagy készpénzben a sofőrnek tudsz fizetni.</div>
@@ -517,7 +518,7 @@ const App = (() => {
       const msg = document.getElementById('loginMsg');
       msg.textContent = 'Facebook belépés indítása...';
       const { error } = await AppAuth.signInWithFacebook();
-      if (error) msg.textContent = 'A Facebook belépéshez a Supabase-ben a Facebook providert is be kell állítani.';
+      if (error) msg.textContent = error.message || 'A Facebook belépés jelenleg nem elérhető.';
     });
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -526,7 +527,7 @@ const App = (() => {
       msg.textContent = 'Belépés...';
       const { error } = await AppAuth.signIn(fd.get('email'), fd.get('password'));
       if (error) {
-        msg.textContent = error.message || 'Nem sikerült a belépés.';
+        msg.textContent = error.message || 'Nem sikerült a belépés. Ellenőrizd az e-mail címet és a jelszót.';
       } else {
         msg.textContent = 'Sikeres belépés...';
         const admin = await AppAuth.isAdmin();
@@ -648,7 +649,7 @@ const App = (() => {
     try {
       const trip = await fetchTripById(id);
       if (!trip) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
-      wrap.innerHTML = tripCard(trip, false) + `<section class="card detail-extra"><h2>Sofőr profil</h2><p><strong>${escapeHtml(trip.nev || '')}</strong></p><p>${starRating(trip.sofor_ertekeles || 4.9)}</p><p>Kapcsolat: ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p></section>`;
+      wrap.innerHTML = tripCard(trip, false) + `<section class="card detail-extra"><h2>Sofőr profil</h2><p><strong>${escapeHtml(trip.nev || '')}</strong></p><p>${starRating(trip.sofor_ertekeles || 4.9)}</p><p>Kapcsolat: ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p>${trip.bankszamla ? `<p><strong>Bankszámla:</strong> ${escapeHtml(trip.bankszamla)}</p>` : ''}<div class="inline-pills" style="margin-top:12px"><a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a></div></section>`;
       await focusRoute(trip.indulas, trip.erkezes);
     } catch (_) {
       wrap.innerHTML = '<div class="empty-state">A fuvar betöltése nem sikerült.</div>';
