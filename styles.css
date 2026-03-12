@@ -205,16 +205,13 @@ input:focus,textarea:focus,select:focus{border-color:rgba(102,164,255,.65); box-
   .driver-profile-card{grid-template-columns:1fr}
 }
 
-
-.muted-inline{color:var(--muted);font-size:.92rem}
-.review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
-.review-list{display:grid;gap:12px;margin:14px 0 0}
-.review-item{border:1px solid var(--line);border-radius:18px;padding:14px;background:rgba(255,255,255,.03)}
-.review-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-.review-item p{margin:0;color:var(--muted);line-height:1.5}
-.review-form-card{margin-top:16px}
-.admin-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:18px}
-.stat-card small{display:block;color:var(--muted);margin-bottom:8px}
-.stat-card strong{font-size:2rem}
-@media (max-width: 1040px){.admin-stats-grid,.review-grid{grid-template-columns:1fr 1fr}}
-@media (max-width: 720px){.admin-stats-grid,.review-grid{grid-template-columns:1fr}.modal{width:min(96vw,760px);max-height:92vh}.trip-actions .btn,.trip-actions a{width:100%}.trip-meta span,.trip-contact div{width:100%}}
+.review-card{border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:16px 18px;background:rgba(255,255,255,.04);margin-top:14px}
+.review-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px}
+.rating-empty,.rating-count{color:var(--muted)}
+.info-card{height:100%}
+.small-help{color:var(--muted);font-size:.92rem}
+code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px}
+@media (max-width: 720px){
+  .trip-card .trip-actions .btn, .trip-card .trip-actions a{width:100%}
+  .review-head{align-items:flex-start;flex-direction:column}
+}

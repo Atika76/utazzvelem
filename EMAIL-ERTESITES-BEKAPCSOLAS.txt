@@ -1,0 +1,15 @@
+EMAIL ÉRTESÍTÉS BEKAPCSOLÁSA – FuvarVelünk
+
+A frontend most már tud új fuvar és új foglalás esetén értesítést küldeni,
+de ehhez még be kell állítani egy Supabase Edge Function URL-t.
+
+LÉPÉSEK:
+1. Supabase CLI telepítés
+2. ebben a mappában: supabase/functions/notify-admin/index.ts
+3. Supabase secret: RESEND_API_KEY
+4. deploy: supabase functions deploy notify-admin
+5. js/config.js fájlban állítsd be:
+   notificationFunctionUrl: 'https://<project-ref>.functions.supabase.co/notify-admin'
+
+Ha ez nincs beállítva, a weboldal többi része működik,
+csak az automatikus e-mail értesítés nem fog kimenni.
