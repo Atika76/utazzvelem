@@ -11,16 +11,36 @@
 <a href="admin.html" data-auth="admin" class="hidden">Admin</a>
 <button type="button" data-auth="user" data-logout class="hidden">Kilépés</button>
 </nav></div></header>
-<main class="section"><div class="container">
+<main class="section"><div class="container two-col">
 <section class="card">
 <span class="eyebrow">Kapcsolat</span>
 <h1 class="page-title">Weboldal kérdés / hibabejelentés</h1>
-<p class="lead">Ha gondod van a weboldallal, a belépéssel vagy egy funkcióval, itt tudsz írni. A sofőrnek szóló kérdést a fuvar hirdetésénél található <strong>Kérdés a sofőrnek</strong> gombbal küldheted.</p>
+<p class="lead">Ha gondod van a weboldallal, a belépéssel vagy egy funkcióval, itt tudsz írni. A sofőrnek szóló kérdést a lenti külön űrlapon küldheted el.</p>
 <p><strong>Oldal neve:</strong> <span data-setting="siteName">FuvarVelünk</span></p>
 <p><strong>E-mail:</strong> <span data-setting="email">cegweb26@gmail.com</span></p>
-<p><strong>Telefon:</strong> <span data-setting="phone">+36 30 123 4567</span></p>
-<p><strong>Város:</strong> <span data-setting="city">Budapest</span></p>
-<form id="contactForm" class="form-stack"><label><span>Név</span><input name="name" required></label><label><span>E-mail</span><input name="email" type="email" required></label><label><span>Üzenet</span><textarea name="message" required></textarea></label><div class="notice">Ez az űrlap a weboldalhoz tartozó általános kérdésekre és hibabejelentésre szolgál.</div><button class="btn btn-primary" type="submit">Üzenet küldése</button></form>
+<form id="contactForm" class="form-stack">
+<label><span>Név</span><input name="name" required></label>
+<label><span>E-mail</span><input name="email" type="email" required></label>
+<label><span>Üzenet</span><textarea name="message" required></textarea></label>
+<div class="notice">Ez az űrlap a weboldalhoz tartozó általános kérdésekre és hibabejelentésre szolgál.</div>
+<button class="btn btn-primary" type="submit">Üzenet küldése</button>
+</form>
+</section>
+<section id="driverQuestionSection" class="card" style="display:none">
+<span class="eyebrow">Sofőrnek írás</span>
+<h2 style="margin-top:12px">Kérdés a sofőrnek</h2>
+<div id="driverQuestionInfo" class="notice"></div>
+<form id="driverQuestionForm" class="form-stack">
+<input type="hidden" name="tripId">
+<input type="hidden" name="driverName">
+<input type="hidden" name="driverEmail">
+<label><span>Név</span><input name="name" required></label>
+<label><span>E-mail</span><input name="email" type="email" required></label>
+<label><span>Üzenet</span><textarea name="message" required placeholder="pl. Van még hely? Hol tudnánk pontosan találkozni?"></textarea></label>
+<div class="notice">Az üzenet a sofőr e-mail címére nyílik meg. A küldéshez be kell jelentkezni.</div>
+<div id="driverQuestionMsg" class="form-message"></div>
+<button class="btn btn-primary" type="submit">Üzenet megnyitása</button>
+</form>
 </section>
 </div></main>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script><script defer src="js/config.js"></script><script defer src="js/supabase-client.js"></script><script defer src="js/auth.js"></script><script defer src="js/app.js"></script></body></html>
