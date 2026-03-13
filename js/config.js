@@ -2,8 +2,6 @@ window.APP_CONFIG = {
   brandName: 'FuvarVelünk',
   companyName: 'FuvarVelünk',
   contactEmail: 'cegweb26@gmail.com',
-  contactPhone: '+36 30 123 4567',
-  city: 'Budapest',
   adminEmail: 'cegweb26@gmail.com',
   siteUrl: 'https://fuvarvelunk.hu/',
   supabaseUrl: 'https://qkppqjcazakocxgxtlzc.supabase.co',

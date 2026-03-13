@@ -8,6 +8,32 @@ const App = (() => {
   let activeMap = null;
   let activeLine = null;
   let activeMarkers = [];
+  let activeMapResizeTimer = null;
+
+  function invalidateMapSoon(times = 3) {
+    if (!activeMap) return;
+    clearTimeout(activeMapResizeTimer);
+    let count = 0;
+    const tick = () => {
+      if (!activeMap) return;
+      try { activeMap.invalidateSize(true); } catch (_) {}
+      count += 1;
+      if (count < times) activeMapResizeTimer = setTimeout(tick, 220);
+    };
+    activeMapResizeTimer = setTimeout(tick, 60);
+  }
+
+  function ensureTripsMap() {
+    const mapEl = document.getElementById('tripsMap');
+    if (!mapEl) return null;
+    if (!activeMap) {
+      activeMap = L.map('tripsMap').setView([47.4979, 19.0402], 7);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(activeMap);
+      window.addEventListener('resize', () => invalidateMapSoon(2), { passive: true });
+    }
+    invalidateMapSoon();
+    return activeMap;
+  }
 
   function escapeHtml(str = '') {
     return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
@@ -278,10 +304,7 @@ const App = (() => {
 
   async function focusRoute(origin, destination) {
     if (!document.getElementById('tripsMap')) return;
-    if (!activeMap) {
-      activeMap = L.map('tripsMap').setView([47.4979, 19.0402], 7);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(activeMap);
-    }
+    ensureTripsMap();
     activeMarkers.forEach(m => activeMap.removeLayer(m));
     activeMarkers = [];
     if (activeLine) activeMap.removeLayer(activeLine);
@@ -302,8 +325,10 @@ const App = (() => {
     if (points.length === 2) {
       activeLine = L.polyline(points, { color: '#63a4ff', weight: 4 }).addTo(activeMap);
       activeMap.fitBounds(activeLine.getBounds(), { padding: [32, 32] });
+      invalidateMapSoon();
     } else if (points.length === 1) {
       activeMap.setView(points[0], 9);
+      invalidateMapSoon();
     }
   }
 
@@ -319,8 +344,9 @@ const App = (() => {
   async function applySettings() {
     const s = await fetchSettings();
     const visibleEmail = s?.contact_email || APP_CONFIG.contactEmail;
-    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = APP_CONFIG.brandName);
-    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = APP_CONFIG.companyName);
+    if (s?.admin_email) { try { localStorage.setItem('fv_admin_email_cache_v1', JSON.stringify({ email: s.admin_email, ts: Date.now() })); } catch (_) {} }
+    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = s?.site_name || APP_CONFIG.brandName);
+    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = s?.company_name || APP_CONFIG.companyName);
     document.querySelectorAll('[data-setting="email"]').forEach(el => el.textContent = visibleEmail);
     document.querySelectorAll('[data-setting="adminEmail"]').forEach(el => el.textContent = s?.admin_email || APP_CONFIG.adminEmail);
     document.querySelectorAll('[data-brand]').forEach(el => el.textContent = APP_CONFIG.brandName);
@@ -754,10 +780,7 @@ const App = (() => {
 
   async function initTripsPage() {
     if (!document.getElementById('tripsList')) return;
-    if (document.getElementById('tripsMap')) {
-      activeMap = L.map('tripsMap').setView([47.4979, 19.0402], 7);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(activeMap);
-    }
+    if (document.getElementById('tripsMap')) ensureTripsMap();
     const params = new URLSearchParams(location.search);
     const originInput = document.getElementById('filterOrigin');
     const destinationInput = document.getElementById('filterDestination');
@@ -775,6 +798,7 @@ const App = (() => {
         const trips = await enrichTripsWithRatings(await fetchApprovedTrips(filters));
         list.innerHTML = trips.length ? trips.map(t => tripListCard(t)).join('') : '<div class="empty-state">Nincs a keresésnek megfelelő fuvar.</div>';
         if (trips[0]) await focusRoute(trips[0].indulas, trips[0].erkezes);
+      else invalidateMapSoon();
         if (!trips.length && recWrap) {
           const all = await enrichTripsWithRatings(await fetchApprovedTrips({}));
           const rec = buildRecommendations(all, filters);
@@ -836,7 +860,8 @@ const App = (() => {
     AppAuth.bindLogout();
     AppAuth.watchAuth();
     if (session) {
-      location.href = (await AppAuth.isAdmin()) ? 'admin.html' : 'index.html';
+      const { admin } = await AppAuth.resolveRole(session.user);
+      location.href = admin ? 'admin.html' : 'index.html';
       return;
     }
     const loginForm = document.getElementById('loginForm');
@@ -852,9 +877,13 @@ const App = (() => {
       const fd = new FormData(loginForm);
       const msg = document.getElementById('loginMsg');
       msg.textContent = 'Belépés...';
-      const { error } = await AppAuth.signIn(fd.get('email'), fd.get('password'));
+      const { data, error } = await AppAuth.signIn(fd.get('email'), fd.get('password'));
       if (error) msg.textContent = error.message || 'Nem sikerült a belépés.';
-      else location.href = (await AppAuth.isAdmin()) ? 'admin.html' : AppAuth.consumeNext('index.html');
+      else {
+        const user = data?.user || data?.session?.user || null;
+        const { admin } = await AppAuth.resolveRole(user);
+        location.href = admin ? 'admin.html' : AppAuth.consumeNext('index.html');
+      }
     });
     registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -896,6 +925,24 @@ const App = (() => {
     statHost.className = 'cards';
     statHost.style.marginBottom = '18px';
     tripsWrap.before(statHost);
+
+    const adminTools = document.createElement('div');
+    adminTools.className = 'card admin-tools';
+    adminTools.style.marginBottom = '18px';
+    adminTools.innerHTML = `
+      <div class="grid-2">
+        <label><span>Fuvar keresése</span><input id="adminTripSearch" placeholder="pl. Budapest, Nyíregyháza, Attila"></label>
+        <label><span>Foglalás keresése</span><input id="adminBookingSearch" placeholder="név, e-mail, telefon"></label>
+      </div>
+      <div class="inline-pills" style="margin-top:12px">
+        <button type="button" class="btn btn-ghost admin-trip-filter active" data-filter="all">Összes</button>
+        <button type="button" class="btn btn-ghost admin-trip-filter" data-filter="approved">Jóváhagyott</button>
+        <button type="button" class="btn btn-ghost admin-trip-filter" data-filter="pending">Függőben</button>
+        <button type="button" class="btn btn-ghost admin-trip-filter" data-filter="full">Betelt</button>
+        <button type="button" class="btn btn-ghost admin-trip-filter" data-filter="expired">Lejárt</button>
+      </div>`;
+    statHost.after(adminTools);
+
     try {
       const [allTrips, bookings, ratings] = await Promise.all([fetchAllTrips(), fetchBookings(), sb.from(tableRatings).select('id')]);
       const liveTrips = allTrips.filter(t => !isTripExpired(t));
@@ -907,9 +954,47 @@ const App = (() => {
         ['Összes fuvar', allTrips.length], ['Jóváhagyott', approved], ['Függőben', pending], ['Betelt fuvar', full], ['Foglalások', bookings.length], ['Értékelések', ratings.data?.length || 0], ['Összes utashely', totalSeats], ['Aktív fuvar', liveTrips.length]
       ].map(([label, value]) => `<div class="card"><div class="small-help">${label}</div><div style="font-size:2rem;font-weight:800;margin-top:10px">${value}</div></div>`).join('');
       const trips = await enrichTripsWithRatings(allTrips);
-      tripsWrap.innerHTML = trips.length ? trips.map(t => tripCard(t, true)).join('') : '<div class="empty-state">Még nincs beküldött fuvar.</div>';
       const tripMap = Object.fromEntries(trips.map(t => [String(t.id), t]));
-      bookingsWrap.innerHTML = bookings.length ? bookings.map(b => bookingCard(b, tripMap)).join('') : '<div class="empty-state">Még nincs foglalás.</div>';
+      const bookingSearch = adminTools.querySelector('#adminBookingSearch');
+      const tripSearch = adminTools.querySelector('#adminTripSearch');
+      let activeTripFilter = 'all';
+
+      function renderTripsAdmin() {
+        const q = (tripSearch?.value || '').trim().toLowerCase();
+        const filtered = trips.filter(t => {
+          const hay = [t.indulas, t.erkezes, t.nev, t.email, t.telefon, t.datum].join(' ').toLowerCase();
+          const bySearch = !q || hay.includes(q);
+          const byStatus = activeTripFilter === 'all'
+            || (activeTripFilter === 'approved' && t.statusz === 'Jóváhagyva')
+            || (activeTripFilter === 'pending' && t.statusz !== 'Jóváhagyva')
+            || (activeTripFilter === 'full' && seatCounts(t).free <= 0)
+            || (activeTripFilter === 'expired' && isTripExpired(t));
+          return bySearch && byStatus;
+        });
+        tripsWrap.innerHTML = filtered.length ? filtered.map(t => tripCard(t, true)).join('') : '<div class="empty-state">Nincs a szűrésnek megfelelő fuvar.</div>';
+      }
+
+      function renderBookingsAdmin() {
+        const q = (bookingSearch?.value || '').trim().toLowerCase();
+        const sorted = [...bookings].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+        const filtered = sorted.filter(b => {
+          const trip = tripMap[String(b.fuvar_id ?? b.trip_id ?? '')] || {};
+          const hay = [b.nev, b.email, b.telefon, b.foglalasi_allapot, b.fizetesi_allapot, trip.indulas, trip.erkezes].join(' ').toLowerCase();
+          return !q || hay.includes(q);
+        });
+        bookingsWrap.innerHTML = filtered.length ? filtered.map(b => bookingCard(b, tripMap)).join('') : '<div class="empty-state">Nincs a keresésnek megfelelő foglalás.</div>';
+      }
+
+      adminTools.querySelectorAll('.admin-trip-filter').forEach(btn => btn.addEventListener('click', () => {
+        activeTripFilter = btn.dataset.filter || 'all';
+        adminTools.querySelectorAll('.admin-trip-filter').forEach(x => x.classList.toggle('active', x === btn));
+        renderTripsAdmin();
+      }));
+      tripSearch?.addEventListener('input', renderTripsAdmin);
+      bookingSearch?.addEventListener('input', renderBookingsAdmin);
+
+      renderTripsAdmin();
+      renderBookingsAdmin();
       if (!APP_CONFIG.notificationFunctionUrl) bookingsWrap.insertAdjacentHTML('beforebegin', notificationNotice('booking'));
     } catch (_) {
       tripsWrap.innerHTML = '<div class="empty-state">A fuvarok betöltése nem sikerült.</div>';
@@ -955,12 +1040,24 @@ const App = (() => {
     const params = new URLSearchParams(location.search);
     if (form) {
       if (!form.querySelector('[name="website"]')) form.insertAdjacentHTML('afterbegin', '<input type="text" name="website" class="hidden" autocomplete="off" tabindex="-1">');
+      const session = await AppAuth.getSession().catch(() => null);
+      const user = session?.user || null;
+      const nameInput = form.querySelector('[name="name"]');
+      const emailInput = form.querySelector('[name="email"]');
+      if (nameInput && !nameInput.value && user) nameInput.value = user.user_metadata?.name || user.user_metadata?.full_name || (user.email ? String(user.email).split('@')[0] : '');
+      if (emailInput && !emailInput.value && user?.email) emailInput.value = user.email;
+      const formMsg = document.createElement('div');
+      formMsg.id = 'contactFormMsg';
+      formMsg.className = 'form-message';
+      form.appendChild(formMsg);
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        try { validateHuman(form); } catch (err) { alert(err.message); return; }
+        try { validateHuman(form); } catch (err) { formMsg.textContent = err.message; return; }
         const fd = new FormData(form);
+        formMsg.textContent = 'Üzenet összeállítása...';
         const subject = encodeURIComponent('Weboldal kérdés / hibajelzés - FuvarVelünk');
         const body = encodeURIComponent(`Név: ${fd.get('name')}\nE-mail: ${fd.get('email')}\n\nÜzenet:\n${fd.get('message')}`);
+        formMsg.textContent = 'Megnyílik az e-mail küldés. Ha nem nyílik meg, másold ki az üzenetet kézzel.';
         location.href = `mailto:${APP_CONFIG.contactEmail}?subject=${subject}&body=${body}`;
       });
     }

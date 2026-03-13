@@ -1,5 +1,8 @@
 window.AppAuth = (() => {
   let cachedAdminEmail = null;
+  let cachedRole = null;
+  const ADMIN_CACHE_KEY = 'fv_admin_email_cache_v1';
+  const ADMIN_CACHE_TTL = 10 * 60 * 1000;
 
   function setNext(url) {
     try { sessionStorage.setItem('uv_next', url || 'index.html'); } catch(_) {}
@@ -23,21 +26,58 @@ window.AppAuth = (() => {
     return data.user;
   }
 
-  async function fetchAdminEmail(force=false) {
-    if (cachedAdminEmail && !force) return cachedAdminEmail;
+  function readCachedAdminEmail() {
+    if (cachedAdminEmail) return cachedAdminEmail;
     try {
-      const { data } = await sb.from('beallitasok').select('id,admin_email').order('id', { ascending: true }).limit(1).maybeSingle();
-      cachedAdminEmail = data?.admin_email || APP_CONFIG.adminEmail;
+      const raw = localStorage.getItem(ADMIN_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.email || !parsed?.ts) return null;
+      if (Date.now() - Number(parsed.ts) > ADMIN_CACHE_TTL) return null;
+      cachedAdminEmail = parsed.email;
+      return cachedAdminEmail;
     } catch (_) {
-      cachedAdminEmail = APP_CONFIG.adminEmail;
+      return null;
     }
+  }
+
+  function writeCachedAdminEmail(email) {
+    cachedAdminEmail = email || APP_CONFIG.adminEmail;
+    try {
+      localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify({ email: cachedAdminEmail, ts: Date.now() }));
+    } catch (_) {}
     return cachedAdminEmail;
   }
 
+  async function fetchAdminEmail(force=false) {
+    if (!force) {
+      const cached = readCachedAdminEmail();
+      if (cached) return cached;
+    }
+    try {
+      const { data } = await sb.from('beallitasok').select('id,admin_email').order('id', { ascending: true }).limit(1).maybeSingle();
+      return writeCachedAdminEmail(data?.admin_email || APP_CONFIG.adminEmail);
+    } catch (_) {
+      return writeCachedAdminEmail(APP_CONFIG.adminEmail);
+    }
+  }
+
+  function isAdminEmail(email, adminEmail) {
+    return !!email && String(email).toLowerCase() === String(adminEmail || APP_CONFIG.adminEmail).toLowerCase();
+  }
+
   async function isAdmin(email) {
-    const adminEmail = await fetchAdminEmail();
     const target = email || (await getUser())?.email;
-    return !!target && String(target).toLowerCase() === String(adminEmail).toLowerCase();
+    const adminEmail = readCachedAdminEmail() || await fetchAdminEmail();
+    return isAdminEmail(target, adminEmail);
+  }
+
+  async function resolveRole(user) {
+    if (!user?.email) return { admin: false, adminEmail: readCachedAdminEmail() || APP_CONFIG.adminEmail };
+    const adminEmail = readCachedAdminEmail() || await fetchAdminEmail();
+    const admin = isAdminEmail(user.email, adminEmail);
+    cachedRole = admin ? 'admin' : 'user';
+    return { admin, adminEmail };
   }
 
   function getDisplayName(user) {
@@ -69,10 +109,10 @@ window.AppAuth = (() => {
     }, 2200);
   }
 
-  async function updateNav() {
-    const session = await getSession();
+  async function updateNav(sessionOverride = null) {
+    const session = sessionOverride || await getSession();
     const user = session?.user || null;
-    const admin = await isAdmin(user?.email);
+    const { admin } = await resolveRole(user);
 
     document.querySelectorAll('[data-auth="guest"]').forEach(el => {
       el.classList.toggle('hidden', !!user);
@@ -101,7 +141,10 @@ window.AppAuth = (() => {
   }
 
   async function signIn(email, password) {
-    return sb.auth.signInWithPassword({ email, password });
+    const result = await sb.auth.signInWithPassword({ email, password });
+    const user = result?.data?.user || result?.data?.session?.user || null;
+    if (user?.email) await resolveRole(user);
+    return result;
   }
 
   async function signUp(email, password, name='') {
@@ -136,6 +179,7 @@ window.AppAuth = (() => {
       sessionStorage.removeItem('uv_next');
       sessionStorage.setItem('uv_logout_notice', 'Sikeres kijelentkezés.');
     } catch(_) {}
+    cachedRole = null;
 
     document.querySelectorAll('[data-auth="guest"]').forEach(el => el.classList.remove('hidden'));
     document.querySelectorAll('[data-auth="user"]').forEach(el => el.classList.add('hidden'));
@@ -145,8 +189,7 @@ window.AppAuth = (() => {
       el.classList.add('hidden');
     });
 
-    const target = (APP_CONFIG.siteUrl || './') + 'index.html?logout=1&ts=' + Date.now();
-    window.location.replace(target);
+    window.location.replace('index.html');
   }
 
   async function requireAuth(next='index.html') {
@@ -203,21 +246,17 @@ window.AppAuth = (() => {
   }
 
   function watchAuth() {
-    sb.auth.onAuthStateChange(async () => {
-      await updateNav();
+    sb.auth.onAuthStateChange(async (_event, session) => {
+      await updateNav(session || null);
     });
   }
 
   function showLogoutMessageIfNeeded() {
     try {
-      const url = new URL(window.location.href);
       const msg = sessionStorage.getItem('uv_logout_notice');
-      if (url.searchParams.get('logout') === '1' || msg) {
+      if (msg) {
         showToast(msg || 'Sikeres kijelentkezés.');
         sessionStorage.removeItem('uv_logout_notice');
-        url.searchParams.delete('logout');
-        const q = url.searchParams.toString();
-        history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
       }
     } catch(_) {}
   }
@@ -234,6 +273,7 @@ window.AppAuth = (() => {
     requireAdmin,
     isAdmin,
     fetchAdminEmail,
+    resolveRole,
     bindLogout,
     bindFacebookLogin,
     watchAuth,

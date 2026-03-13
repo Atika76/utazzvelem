@@ -240,3 +240,6 @@ code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px}
 .ai-output{width:100%;min-height:120px;padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:#fff;font:inherit;line-height:1.6}
 .ai-help{font-size:.95rem;color:var(--muted);line-height:1.6}
 @media (max-width:640px){.ai-inline-actions{flex-direction:column}.ai-btn{width:100%}}
+
+.admin-tools input{width:100%}
+.admin-trip-filter.active{background:rgba(99,164,255,.18);border-color:rgba(99,164,255,.75);color:var(--text)}
