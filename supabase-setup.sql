@@ -1,3 +1,7 @@
+-- =====================================================
+-- FUVARVELUNK - PROFILKÉP, AUTÓKÉPEK, JOGOSULTSÁGOK
+-- =====================================================
+
 update public.beallitasok
 set
   site_name = 'FuvarVelünk',
@@ -10,66 +14,69 @@ alter table if exists public.fuvarok add column if not exists user_id uuid;
 alter table if exists public.fuvarok add column if not exists approved boolean default false;
 alter table if exists public.fuvarok add column if not exists created_at timestamptz default now();
 alter table if exists public.fuvarok add column if not exists updated_at timestamptz default now();
+alter table if exists public.fuvarok add column if not exists sofor_profilkep text;
+alter table if exists public.fuvarok add column if not exists auto_kepek jsonb default '[]'::jsonb;
+alter table if exists public.fuvarok add column if not exists sofor_ertekeles numeric default 4.9;
 
 create index if not exists idx_fuvarok_approved_created_at
 on public.fuvarok (approved, created_at desc);
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_policies
-    where schemaname='public' and tablename='fuvarok' and policyname='Fuvar beszúrás engedélyezése'
-  ) then
-    create policy "Fuvar beszúrás engedélyezése"
-    on public.fuvarok
-    for insert
-    to authenticated
-    with check (true);
-  end if;
+create index if not exists idx_fuvarok_user_id
+on public.fuvarok (user_id);
 
-  if not exists (
-    select 1 from pg_policies
-    where schemaname='public' and tablename='fuvarok' and policyname='Fuvar olvasás engedélyezése'
-  ) then
-    create policy "Fuvar olvasás engedélyezése"
-    on public.fuvarok
-    for select
-    to anon, authenticated
-    using (true);
-  end if;
+alter table if exists public.fuvarok enable row level security;
 
-  if not exists (
-    select 1 from pg_policies
-    where schemaname='public' and tablename='fuvarok' and policyname='Fuvar módosítás adminnak'
-  ) then
-    create policy "Fuvar módosítás adminnak"
-    on public.fuvarok
-    for update
-    to authenticated
-    using (true)
-    with check (true);
-  end if;
-end $$;
+-- régi / túl laza policyk törlése
 
-alter table if exists public.fuvarok add column if not exists sofor_ertekeles numeric default 4.9;
+drop policy if exists "Fuvar beszúrás engedélyezése" on public.fuvarok;
+drop policy if exists "Fuvar olvasás engedélyezése" on public.fuvarok;
+drop policy if exists "Fuvar módosítás adminnak" on public.fuvarok;
+drop policy if exists "Fuvar törlés engedélyezése" on public.fuvarok;
+drop policy if exists "Fuvarok olvasása" on public.fuvarok;
+drop policy if exists "Fuvar beszúrás" on public.fuvarok;
+drop policy if exists "Fuvar módosítás" on public.fuvarok;
+drop policy if exists "Fuvar törlés" on public.fuvarok;
 
+create policy "Fuvarok olvasása"
+on public.fuvarok
+for select
+using (
+  statusz = 'Jóváhagyva'
+  or auth.uid() = user_id
+  or lower(coalesce(auth.email(), '')) = 'cegweb26@gmail.com'
+);
 
+create policy "Fuvar beszúrás"
+on public.fuvarok
+for insert
+with check (
+  auth.uid() = user_id
+);
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_policies where schemaname='public' and tablename='fuvarok' and policyname='Fuvar törlés engedélyezése'
-  ) then
-    create policy "Fuvar törlés engedélyezése"
-    on public.fuvarok
-    for delete
-    to authenticated
-    using (true);
-  end if;
-end $$;
+create policy "Fuvar módosítás"
+on public.fuvarok
+for update
+using (
+  auth.uid() = user_id
+  or lower(coalesce(auth.email(), '')) = 'cegweb26@gmail.com'
+)
+with check (
+  auth.uid() = user_id
+  or lower(coalesce(auth.email(), '')) = 'cegweb26@gmail.com'
+);
 
+create policy "Fuvar törlés"
+on public.fuvarok
+for delete
+using (
+  auth.uid() = user_id
+  or lower(coalesce(auth.email(), '')) = 'cegweb26@gmail.com'
+);
 
--- E-mail napló
+-- =====================================================
+-- E-MAIL NAPLÓ
+-- =====================================================
+
 create table if not exists public.email_naplo (
   id bigserial primary key,
   tipus text not null,
@@ -84,5 +91,5 @@ create table if not exists public.email_naplo (
 alter table public.email_naplo enable row level security;
 drop policy if exists "Email naplo olvasas" on public.email_naplo;
 drop policy if exists "Email naplo iras" on public.email_naplo;
-create policy "Email naplo olvasas" on public.email_naplo for select using (auth.email() = 'cegweb26@gmail.com');
+create policy "Email naplo olvasas" on public.email_naplo for select using (lower(coalesce(auth.email(), '')) = 'cegweb26@gmail.com');
 create policy "Email naplo iras" on public.email_naplo for insert with check (auth.uid() is not null);

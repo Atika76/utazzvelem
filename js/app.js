@@ -74,6 +74,97 @@ const App = (() => {
     return parts.slice(0, 2).map(x => x[0]?.toUpperCase() || '').join('') || '?';
   }
 
+
+  function parseCarImages(trip) {
+    const raw = trip?.auto_kepek;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.filter(Boolean).slice(0, 3);
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(Boolean).slice(0, 3) : [];
+      } catch (_) {
+        return raw ? [raw] : [];
+      }
+    }
+    return [];
+  }
+
+  function avatarMarkup(trip, cls = 'driver-avatar') {
+    const img = trip?.sofor_profilkep || '';
+    if (img) return `<div class="${cls} has-photo"><img src="${escapeHtml(img)}" alt="${escapeHtml(trip?.nev || 'Sofőr')} profilképe"></div>`;
+    return `<div class="${cls}">${escapeHtml(getInitials(trip?.nev || ''))}</div>`;
+  }
+
+  function galleryMarkup(urls = [], cls = 'car-gallery') {
+    const clean = (urls || []).filter(Boolean).slice(0, 3);
+    if (!clean.length) return '';
+    return `<div class="${cls}">${clean.map((url, i) => `<button type="button" class="gallery-item js-open-image" data-src="${escapeHtml(url)}" data-alt="Autó kép ${i + 1}"><img src="${escapeHtml(url)}" alt="Autó kép ${i + 1}"></button>`).join('')}</div>`;
+  }
+
+  async function fileToDataUrl(file, opts = {}) {
+    const maxW = opts.maxW || 1200;
+    const maxH = opts.maxH || 1200;
+    const quality = opts.quality || 0.82;
+    const read = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
+    });
+    if (!String(file.type || '').startsWith('image/')) return read;
+    const img = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      im.src = read;
+    });
+    let { width, height } = img;
+    const ratio = Math.min(1, maxW / width, maxH / height);
+    width = Math.max(1, Math.round(width * ratio));
+    height = Math.max(1, Math.round(height * ratio));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  async function filesToDataUrls(fileList, maxCount = 1, opts = {}) {
+    const files = Array.from(fileList || []).filter(f => String(f.type || '').startsWith('image/')).slice(0, maxCount);
+    const out = [];
+    for (const file of files) out.push(await fileToDataUrl(file, opts));
+    return out;
+  }
+
+  function fillPreview(host, urls = [], allowRemove = false) {
+    if (!host) return;
+    const clean = (urls || []).filter(Boolean);
+    host.innerHTML = clean.length
+      ? clean.map((url, i) => `<div class="preview-thumb"><img src="${escapeHtml(url)}" alt="Kép ${i + 1}">${allowRemove ? `<button type="button" class="preview-remove js-remove-preview" data-index="${i}">×</button>` : ''}</div>`).join('')
+      : '<div class="notice">Még nincs feltöltött kép.</div>';
+  }
+
+  async function tripBookingsInfo(tripId) {
+    try {
+      const { data, error } = await sb.from(tableBookings).select('id,foglalasi_allapot,fizetesi_allapot').eq('fuvar_id', tripId);
+      if (error) return [];
+      return data || [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function ownerCanDeleteTrip(tripId) {
+    const bookings = await tripBookingsInfo(tripId);
+    return !bookings.some(b => {
+      const a = String(b.foglalasi_allapot || '').toLowerCase();
+      const p = String(b.fizetesi_allapot || '').toLowerCase();
+      return !a.includes('töröl') && !a.includes('cancel') && !p.includes('töröl') && !p.includes('cancel');
+    });
+  }
+
   function buildGoogleMapsDirectionsUrl(origin, destination) {
     const from = [String(origin || '').trim(), 'Magyarország'].filter(Boolean).join(', ');
     const to = [String(destination || '').trim(), 'Magyarország'].filter(Boolean).join(', ');
@@ -505,7 +596,7 @@ const App = (() => {
         <div class="trip-main">
           <div class="inline-pills"><span class="pill">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</span>${statusBadge(trip.statusz || 'Jóváhagyva')} ${fullBadge}</div>
           <h3>${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</h3>
-          <div class="driver-mini"><strong>${escapeHtml(trip.nev || '')}</strong><span>${ratingHtml}</span></div>
+          <div class="driver-mini">${avatarMarkup(trip, 'driver-avatar small')}<div><strong>${escapeHtml(trip.nev || '')}</strong><span>${ratingHtml}</span></div></div>
           <div class="trip-meta">
             <span><strong>Dátum:</strong> ${escapeHtml(trip.datum || '')}</span>
             <span><strong>Idő:</strong> ${escapeHtml(trip.ido || '')}</span>
@@ -521,6 +612,7 @@ const App = (() => {
             <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>
             ${trip.bankszamla ? `<div><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla)}</div>` : ''}
           </div>
+          ${parseCarImages(trip).length ? `<div><strong style="display:block;margin:14px 0 8px">Autó képei</strong>${galleryMarkup(parseCarImages(trip))}</div>` : ''}
         </div>
         <div>
           <div class="card info-card">
@@ -558,7 +650,7 @@ const App = (() => {
         <div class="inline-pills"><span class="pill">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</span>${statusBadge(trip.statusz || 'Jóváhagyva')} ${full ? '<span class="status rejected">Betelt</span><span class="status info">Már nem foglalható</span>' : ''}</div>
         <h3>${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</h3>
         <p class="trip-compact-meta">${escapeHtml(trip.datum || '')} • ${escapeHtml(trip.ido || '')} • ${fmtCurrency(trip.ar)} Ft / fő</p>
-        <div class="driver-mini"><strong>${escapeHtml(trip.nev || '')}</strong><span>${ratingHtml}</span></div>
+        <div class="driver-mini">${avatarMarkup(trip, 'driver-avatar small')}<div><strong>${escapeHtml(trip.nev || '')}</strong><span>${ratingHtml}</span></div></div>
         ${seatBar(free, total)}
         <div class="trip-tools">
           <a class="btn btn-ghost" href="trip.html?id=${trip.id}">Részletek</a>
@@ -622,6 +714,14 @@ const App = (() => {
     const totalSeats = Number(fd.get('osszHely') || 0);
     const freeSeats = Number(fd.get('szabadHely') || totalSeats || 0);
     const payment = Array.from(form.querySelectorAll('input[name="fizetesiMod"]:checked')).map(x => x.value === 'barion' ? 'transfer' : x.value);
+    const editingTripId = form.dataset.editTripId || '';
+    const editingTrip = form.__editingTrip || null;
+    const keptProfile = form.dataset.profileImage || '';
+    const keptCars = (() => { try { return JSON.parse(form.dataset.carImages || '[]'); } catch (_) { return []; } })();
+    const profileInput = form.querySelector('[name="profileImage"]');
+    const carInput = form.querySelector('[name="carImages"]');
+    const profileUrls = profileInput?.files?.length ? await filesToDataUrls(profileInput.files, 1, { maxW: 720, maxH: 720, quality: 0.84 }) : (keptProfile ? [keptProfile] : []);
+    const carUrls = carInput?.files?.length ? await filesToDataUrls(carInput.files, 3, { maxW: 1400, maxH: 1000, quality: 0.82 }) : keptCars;
     const payload = {
       user_id: user?.id || null,
       nev: fd.get('driverName')?.toString().trim() || '',
@@ -638,17 +738,24 @@ const App = (() => {
       auto_tipus: fd.get('carType')?.toString().trim() || '',
       ar: Number(fd.get('price') || 0),
       megjegyzes: fd.get('note')?.toString().trim() || '',
-      statusz: 'Függőben',
+      statusz: editingTripId ? 'Függőben' : 'Függőben',
       fizetesi_modok: payment.length ? payment : ['cash'],
       bankszamla: fd.get('bankAccount')?.toString().trim() || '',
-      sofor_ertekeles: 0,
-      ertekeles_db: 0
+      sofor_ertekeles: Number(editingTrip?.sofor_ertekeles || 0),
+      ertekeles_db: Number(editingTrip?.ertekeles_db || 0),
+      sofor_profilkep: profileUrls[0] || '',
+      auto_kepek: carUrls
     };
     if (!payload.nev || !payload.indulas || !payload.erkezes) throw new Error('Tölts ki minden kötelező mezőt.');
+    if (editingTripId) {
+      const { error } = await sb.from(tableTrips).update(payload).eq('id', editingTripId).eq('user_id', user?.id || '');
+      if (error) throw error;
+      return { mailOk: false, updated: true };
+    }
     const { error } = await sb.from(tableTrips).insert([payload]);
     if (error) throw error;
     const mailOk = await sendNotificationMail('uj_fuvar', payload);
-    return mailOk;
+    return { mailOk, updated: false };
   }
 
   async function submitBooking(trip, form) {
@@ -723,6 +830,27 @@ const App = (() => {
       const shareBtn = e.target.closest('.js-share-trip');
       if (shareBtn) {
         await shareTrip(JSON.parse(decodeURIComponent(shareBtn.dataset.trip)));
+        return;
+      }
+      const openImageBtn = e.target.closest('.js-open-image');
+      if (openImageBtn) {
+        openModal(`<div class="section-head"><div><span class="eyebrow">Képnéző</span></div><button class="btn btn-secondary" data-close="1">Bezárás</button></div><img src="${escapeHtml(openImageBtn.dataset.src || '')}" alt="${escapeHtml(openImageBtn.dataset.alt || 'Kép')}" class="modal-image">`);
+        return;
+      }
+      const ownerEdit = e.target.closest('.js-owner-trip-edit');
+      if (ownerEdit) {
+        location.href = `fuvar-feladas.html?edit=${encodeURIComponent(ownerEdit.dataset.id || '')}`;
+        return;
+      }
+      const ownerDelete = e.target.closest('.js-owner-trip-delete');
+      if (ownerDelete) {
+        const tripId = ownerDelete.dataset.id || '';
+        const canDelete = await ownerCanDeleteTrip(tripId);
+        if (!canDelete) { alert('Ez a fuvar már foglalást vagy fizetést kapott, ezért nem törölhető a sofőr által.'); return; }
+        if (confirm('Biztosan törlöd ezt a fuvart?')) {
+          await sb.from(tableTrips).delete().eq('id', tripId);
+          location.href = 'fuvarok.html';
+        }
         return;
       }
       const bookBtn = e.target.closest('.js-book-trip');
@@ -890,23 +1018,106 @@ const App = (() => {
     if (driverNameInput && !driverNameInput.value) driverNameInput.value = user?.user_metadata?.name || user?.user_metadata?.full_name || (user?.email ? String(user.email).split('@')[0] : '');
     const total = form.querySelector('[name="osszHely"]');
     const free = form.querySelector('[name="szabadHely"]');
-    total.addEventListener('input', () => free.value = total.value);
+    total.addEventListener('input', () => { if (!form.dataset.editTripId) free.value = total.value; });
     const info = document.createElement('div');
     info.innerHTML = notificationNotice('trip');
     form.appendChild(info);
     mountTripAiTools(form);
+
+    const profilePreview = document.getElementById('profileImagePreview');
+    const carPreview = document.getElementById('carImagesPreview');
+    const params = new URLSearchParams(location.search);
+    const editId = params.get('edit');
+    if (editId) {
+      const trip = await fetchTripById(editId);
+      if (!trip) {
+        document.getElementById('tripFormMsg').textContent = 'A szerkeszteni kívánt fuvar nem található.';
+      } else if (trip.user_id !== user?.id && !(await AppAuth.isAdmin(user?.email))) {
+        document.getElementById('tripFormMsg').textContent = 'Ezt a fuvart nem szerkesztheted.';
+      } else {
+        form.dataset.editTripId = trip.id;
+        form.__editingTrip = trip;
+        document.querySelector('.page-title').textContent = 'Fuvar szerkesztése';
+        const lead = document.querySelector('.lead');
+        if (lead) lead.textContent = 'A módosított hirdetést az adminnak újra jóvá kell hagynia, mielőtt ismét nyilvánosan megjelenik.';
+        form.querySelector('[name="driverName"]').value = trip.nev || '';
+        form.querySelector('[name="phone"]').value = trip.telefon || '';
+        form.querySelector('[name="carType"]').value = trip.auto_tipus || '';
+        form.querySelector('[name="bankAccount"]').value = trip.bankszamla || '';
+        form.querySelector('[name="origin"]').value = trip.indulas || '';
+        form.querySelector('[name="destination"]').value = trip.erkezes || '';
+        form.querySelector('[name="date"]').value = trip.datum || '';
+        form.querySelector('[name="time"]').value = trip.ido || '';
+        form.querySelector('[name="price"]').value = trip.ar || '';
+        form.querySelector('[name="osszHely"]').value = trip.osszes_hely || trip.auto_helyek || trip.helyek || '';
+        form.querySelector('[name="szabadHely"]').value = trip.szabad_helyek ?? trip.helyek ?? '';
+        form.querySelector('[name="note"]').value = trip.megjegyzes || '';
+        Array.from(form.querySelectorAll('input[name="fizetesiMod"]')).forEach(el => {
+          const val = el.value === 'barion' ? 'transfer' : el.value;
+          el.checked = Array.isArray(trip.fizetesi_modok) ? trip.fizetesi_modok.includes(val) : true;
+        });
+        form.dataset.profileImage = trip.sofor_profilkep || '';
+        form.dataset.carImages = JSON.stringify(parseCarImages(trip));
+        fillPreview(profilePreview, trip.sofor_profilkep ? [trip.sofor_profilkep] : [], true);
+        fillPreview(carPreview, parseCarImages(trip), true);
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Fuvar módosítás mentése';
+      }
+    }
+
+    form.querySelector('[name="profileImage"]')?.addEventListener('change', async e => {
+      const urls = await filesToDataUrls(e.target.files, 1, { maxW: 720, maxH: 720, quality: 0.84 });
+      form.dataset.profileImage = urls[0] || '';
+      fillPreview(profilePreview, urls, true);
+    });
+    form.querySelector('[name="carImages"]')?.addEventListener('change', async e => {
+      const urls = await filesToDataUrls(e.target.files, 3, { maxW: 1400, maxH: 1000, quality: 0.82 });
+      form.dataset.carImages = JSON.stringify(urls);
+      fillPreview(carPreview, urls, true);
+    });
+    form.addEventListener('click', e => {
+      const removeBtn = e.target.closest('.js-remove-preview');
+      if (!removeBtn) return;
+      const idx = Number(removeBtn.dataset.index || 0);
+      const preview = removeBtn.closest('.image-preview-grid');
+      if (preview?.id === 'profileImagePreview') {
+        form.dataset.profileImage = '';
+        const input = form.querySelector('[name="profileImage"]');
+        if (input) input.value = '';
+        fillPreview(profilePreview, [], true);
+      } else {
+        let arr = [];
+        try { arr = JSON.parse(form.dataset.carImages || '[]'); } catch (_) {}
+        arr.splice(idx, 1);
+        form.dataset.carImages = JSON.stringify(arr);
+        const input = form.querySelector('[name="carImages"]');
+        if (input) input.value = '';
+        fillPreview(carPreview, arr, true);
+      }
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const msg = document.getElementById('tripFormMsg');
       msg.textContent = 'Mentés...';
       try {
-        const mailOk = await submitTrip(form);
-        msg.textContent = !APP_CONFIG.notificationFunctionUrl
-          ? 'A fuvar rögzítve lett. Admin jóváhagyás után megjelenik a listában.'
-          : (mailOk
+        const result = await submitTrip(form);
+        msg.textContent = result.updated
+          ? 'A fuvar módosítva lett. Az adminnak újra jóvá kell hagynia.'
+          : (!APP_CONFIG.notificationFunctionUrl
+            ? 'A fuvar rögzítve lett. Admin jóváhagyás után megjelenik a listában.'
+            : (result.mailOk
               ? 'A fuvar rögzítve lett. Az admin e-mail értesítés is sikeresen elindult.'
-              : 'A fuvar rögzítve lett, de az e-mail értesítés nem ment ki. Ellenőrizd a Supabase Edge Function logokat és a Resend beállításokat.');
+              : 'A fuvar rögzítve lett, de az e-mail értesítés nem ment ki. Ellenőrizd a Supabase Edge Function logokat és a Resend beállításokat.'));
+        if (result.updated) {
+          setTimeout(() => location.href = 'driver.html?name=' + encodeURIComponent(form.querySelector('[name="driverName"]').value || '') + '&email=' + encodeURIComponent(user?.email || ''), 900);
+          return;
+        }
         form.reset();
+        form.dataset.profileImage = '';
+        form.dataset.carImages = '[]';
+        fillPreview(profilePreview, [], true);
+        fillPreview(carPreview, [], true);
         form.querySelector('[name="contactEmail"]').value = user?.email || '';
       } catch (err) {
         msg.textContent = err.message || 'Nem sikerült menteni.';
@@ -1014,19 +1225,23 @@ const App = (() => {
     const params = new URLSearchParams(location.search);
     const email = params.get('email');
     const name = params.get('name');
+    const session = await AppAuth.getSession();
+    const currentUser = session?.user || null;
     const allTrips = await enrichTripsWithRatings(await fetchApprovedTrips({}).catch(() => []));
     const trips = allTrips.filter(t => (email && t.email === email) || (name && t.nev === name));
     const trip = trips[0] || { nev: name || 'Ismeretlen sofőr', email: email || '', telefon: '' };
+    const ownProfile = !!currentUser?.email && String(currentUser.email).toLowerCase() === String(trip.email || '').toLowerCase();
     box.innerHTML = `
-      <div class="driver-avatar">${getInitials(trip.nev)}</div>
+      ${avatarMarkup(trip)}
       <div class="driver-meta">
         <h2>${escapeHtml(trip.nev || 'Ismeretlen sofőr')}</h2>
         <div>${starRating(trip.sofor_atlag || 0, trip.sofor_ertekeles_db || 0)}</div>
         <p style="margin:10px 0 0">Kapcsolat: ${escapeHtml(trip.email || '-')}</p>
         <p style="margin:8px 0 0">Aktív fuvarok száma: ${trips.length}</p>
+        ${ownProfile ? '<p style="margin:10px 0 0" class="small-help">Itt látod a saját profilképedet is. A képet a fuvar szerkesztésénél tudod cserélni.</p>' : ''}
       </div>`;
     const tripsBox = document.getElementById('driverTrips');
-    if (tripsBox) tripsBox.innerHTML = trips.length ? trips.map(t => `<article class="trip-card card"><div class="eyebrow">${escapeHtml(t.indulas)} → ${escapeHtml(t.erkezes)}</div><h3>${escapeHtml(t.indulas)} → ${escapeHtml(t.erkezes)}</h3><p>${escapeHtml(t.datum)} ${escapeHtml(t.ido)} · ${fmtCurrency(t.ar)} Ft/fő</p><a class="btn btn-secondary" href="trip.html?id=${t.id}">Részletek</a></article>`).join('') : '<div class="notice">Ennél a sofőrnél még nincs aktív fuvar.</div>';
+    if (tripsBox) tripsBox.innerHTML = trips.length ? trips.map(t => `<article class="trip-card card"><div class="trip-main"><div class="inline-pills"><span class="pill">${escapeHtml(t.indulas)} → ${escapeHtml(t.erkezes)}</span>${statusBadge(t.statusz || 'Jóváhagyva')}</div><h3>${escapeHtml(t.indulas)} → ${escapeHtml(t.erkezes)}</h3><p>${escapeHtml(t.datum)} ${escapeHtml(t.ido)} · ${fmtCurrency(t.ar)} Ft/fő</p>${galleryMarkup(parseCarImages(t), 'car-gallery compact')}</div><div class="trip-actions">${ownProfile ? `<button type="button" class="btn btn-secondary js-owner-trip-edit" data-id="${t.id}">Szerkesztés</button><button type="button" class="btn btn-danger js-owner-trip-delete" data-id="${t.id}">Törlés</button>` : ''}<a class="btn btn-secondary" href="trip.html?id=${t.id}">Részletek</a></div></article>`).join('') : '<div class="notice">Ennél a sofőrnél még nincs aktív fuvar.</div>';
     const contact = document.getElementById('driverContactBox');
     if (contact) contact.innerHTML = `<strong>${escapeHtml(trip.nev || 'Sofőr')}</strong><br>${escapeHtml(trip.email || '-')}</div>`;
     const reviewsHost = document.createElement('section');
@@ -1120,9 +1335,9 @@ const App = (() => {
         ${tripCard(trip, false)}
         <section class="card detail-extra">
           <div class="section-head"><div><span class="eyebrow">Sofőr profil</span><h2 style="margin:12px 0 0">${escapeHtml(trip.nev || '')}</h2></div><a class="btn btn-secondary" href="driver.html?name=${encodeURIComponent(trip.nev || '')}&email=${encodeURIComponent(trip.email || '')}">Sofőr profil</a></div>
-          <p>${starRating(trip.sofor_atlag || 0, trip.sofor_ertekeles_db || 0)}</p>
-          <p><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p>
-          <p><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla || '-')}</p>
+          <div class="driver-mini">${avatarMarkup(trip, 'driver-avatar')}<div><p>${starRating(trip.sofor_atlag || 0, trip.sofor_ertekeles_db || 0)}</p><p><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p><p><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla || '-')}</p></div></div>
+          ${parseCarImages(trip).length ? `<div style="margin-top:16px"><strong style="display:block;margin-bottom:8px">Autó képei</strong>${galleryMarkup(parseCarImages(trip))}</div>` : ''}
+          <div id="ownerTripActions"></div>
         </section>
         <section class="two-col" style="margin-top:18px">
           <section class="card"><h2>Sofőr értékelései</h2>${driverReviews.length ? driverReviews.map(reviewCard).join('') : '<div class="notice">Még nincs értékelés.</div>'}
@@ -1147,6 +1362,11 @@ const App = (() => {
           </section>
         </section>`;
       await focusRoute(trip.indulas, trip.erkezes);
+      const session = await AppAuth.getSession();
+      const ownerBox = document.getElementById('ownerTripActions');
+      if (ownerBox && session?.user?.id && session.user.id === trip.user_id) {
+        ownerBox.innerHTML = `<div class="owner-actions"><button type="button" class="btn btn-secondary js-owner-trip-edit" data-id="${trip.id}">Fuvar szerkesztése</button><button type="button" class="btn btn-danger js-owner-trip-delete" data-id="${trip.id}">Fuvar törlése</button><div class="small-help">Szerkesztés után a fuvar ismét admin jóváhagyást kér. Törlés csak akkor lehetséges, ha nincs hozzá foglalás vagy fizetett állapot.</div></div>`;
+      }
       document.getElementById('driverRatingForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const msg = document.getElementById('driverRatingMsg');
