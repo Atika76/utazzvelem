@@ -258,7 +258,7 @@ const App = (() => {
     uploadWrap.className = 'grid-2';
     uploadWrap.innerHTML = `
       <label><span>Sofőr profilkép</span><input name="driverProfileImage" type="file" accept="image/*"><small class="small-help">1 profilkép tölthető fel. A piros X-szel mentés előtt törölheted vagy cserélheted.</small><div id="driverProfilePreview" class="upload-preview upload-preview-single"></div></label>
-      <label><span>Autó képei</span><input name="carImages" type="file" accept="image/*"><small class="small-help">Legfeljebb 3 autókép tölthető fel, egyesével is. A piros X-szel mentés előtt törölheted őket.</small><div id="carImagesPreview" class="upload-preview"></div></label>`;
+      <label><span>Autó képei</span><input name="carImages" type="file" accept="image/*" multiple><small class="small-help">Legfeljebb 3 autókép tölthető fel, egyesével vagy egyszerre kijelölve is. A piros X-szel mentés előtt törölheted őket.</small><div id="carImagesPreview" class="upload-preview"></div></label>`;
     afterBankGrid?.insertAdjacentElement('afterend', uploadWrap);
 
     const profileInput = uploadWrap.querySelector('[name="driverProfileImage"]');

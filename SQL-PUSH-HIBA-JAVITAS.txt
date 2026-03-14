@@ -1,0 +1,21 @@
+Futtasd le ezt a Supabase SQL Editorban, ha a hirdetés feladásnál ezt írja ki:
+
+unrecognized configuration parameter "app.onesignal_app_id"
+
+Ez a korábban kézzel lefuttatott hibás SQL push trigger/funkciók törlése. A ZIP-ben lévő rendszer a notify-admin és cleanup-expired-trips Edge Functionöket használja, nem ezt a hibás SQL current_setting-es megoldást.
+
+SQL:
+
+DROP TRIGGER IF EXISTS trg_push_fuvar ON public.fuvarok;
+DROP TRIGGER IF EXISTS trg_push_foglalas ON public.foglalasok;
+DROP TRIGGER IF EXISTS trg_push_jovahagy ON public.foglalasok;
+
+DROP FUNCTION IF EXISTS public.push_admin_uj_fuvar();
+DROP FUNCTION IF EXISTS public.push_sofor_uj_foglalas();
+DROP FUNCTION IF EXISTS public.push_utas_jovahagyva();
+DROP FUNCTION IF EXISTS public.send_push(text, text, text);
+
+Ha a cronból is kézzel lett létrehozva hibás push emlékeztető, azt is töröld:
+
+SELECT cron.unschedule('fuvar_emlekezteto')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'fuvar_emlekezteto');
