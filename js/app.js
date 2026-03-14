@@ -829,19 +829,25 @@ const App = (() => {
     const fd = new FormData(form);
     const rating = Number(fd.get('csillag') || 0);
     const text = fd.get('szoveg')?.toString().trim() || '';
-    const name = fd.get('name')?.toString().trim() || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Felhasználó';
+    const name = fd.get('name')?.toString().trim() || user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Felhasználó';
+    const userEmail = (user?.email || '').trim().toLowerCase();
+    const tripEmail = (trip?.email || '').trim().toLowerCase();
     if (rating < 1 || rating > 5) throw new Error('1 és 5 közötti csillagot adj meg.');
-    if (text.length < 6) throw new Error('Írj legalább pár szót az értékeléshez.');
+    if (userEmail && tripEmail && userEmail === tripEmail) throw new Error('A saját fuvarodat nem értékelheted.');
     const payload = {
       fuvar_id: trip.id,
       user_email: user?.email || '',
       user_name: name,
       csillag: rating,
-      szoveg: text,
+      szoveg: text || null,
       tipus
     };
     const { error } = await sb.from(tableRatings).insert([payload]);
-    if (error) throw error;
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.includes('duplicate') || msg.includes('unique')) throw new Error('Ezt a fuvart ebből a típusból már értékelted.');
+      throw error;
+    }
   }
 
   async function bindGlobalActions() {
@@ -1333,27 +1339,39 @@ const App = (() => {
         </section>
         <section class="two-col" style="margin-top:18px">
           <section class="card"><h2>Sofőr értékelései</h2>${driverReviews.length ? driverReviews.map(reviewCard).join('') : '<div class="notice">Még nincs értékelés.</div>'}
+            <div id="selfRatingNoticeDriver" class="notice hidden" style="margin-top:18px">A saját fuvarodat és saját magadat nem értékelheted.</div>
             <form id="driverRatingForm" class="form-stack" style="margin-top:18px">
               <input type="text" name="website" class="hidden" autocomplete="off" tabindex="-1">
               <h3>Sofőr értékelése</h3>
               <div class="grid-2"><label><span>Név</span><input name="name" required placeholder="A neved"></label><label><span>Csillag (1-5)</span><input name="csillag" type="number" min="1" max="5" required></label></div>
-              <label><span>Szöveges értékelés</span><textarea name="szoveg" required placeholder="Írd le röviden a tapasztalatodat"></textarea></label>
+              <label><span>Szöveges értékelés (nem kötelező)</span><textarea name="szoveg" placeholder="Írd le röviden a tapasztalatodat (nem kötelező)"></textarea></label>
               <div class="form-message" id="driverRatingMsg"></div>
               <button class="btn btn-primary" type="submit">Értékelés mentése</button>
             </form>
           </section>
           <section class="card"><h2>Utazás értékelései</h2>${tripReviews.length ? tripReviews.map(reviewCard).join('') : '<div class="notice">Még nincs értékelés.</div>'}
+            <div id="selfRatingNoticeTrip" class="notice hidden" style="margin-top:18px">A saját fuvarodat és saját magadat nem értékelheted.</div>
             <form id="tripRatingForm" class="form-stack" style="margin-top:18px">
               <input type="text" name="website" class="hidden" autocomplete="off" tabindex="-1">
               <h3>Utazás értékelése</h3>
               <div class="grid-2"><label><span>Név</span><input name="name" required placeholder="A neved"></label><label><span>Csillag (1-5)</span><input name="csillag" type="number" min="1" max="5" required></label></div>
-              <label><span>Szöveges értékelés</span><textarea name="szoveg" required placeholder="Írd le röviden a tapasztalatodat"></textarea></label>
+              <label><span>Szöveges értékelés (nem kötelező)</span><textarea name="szoveg" placeholder="Írd le röviden a tapasztalatodat (nem kötelező)"></textarea></label>
               <div class="form-message" id="tripRatingMsg"></div>
               <button class="btn btn-primary" type="submit">Értékelés mentése</button>
             </form>
           </section>
         </section>`;
       await focusRoute(trip.indulas, trip.erkezes);
+      const session = await AppAuth.getSession();
+      const currentEmail = (session?.user?.email || '').trim().toLowerCase();
+      const tripEmail = (trip?.email || '').trim().toLowerCase();
+      const isOwnTrip = !!currentEmail && !!tripEmail && currentEmail === tripEmail;
+      if (isOwnTrip) {
+        document.getElementById('driverRatingForm')?.classList.add('hidden');
+        document.getElementById('tripRatingForm')?.classList.add('hidden');
+        document.getElementById('selfRatingNoticeDriver')?.classList.remove('hidden');
+        document.getElementById('selfRatingNoticeTrip')?.classList.remove('hidden');
+      }
       document.getElementById('driverRatingForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const msg = document.getElementById('driverRatingMsg');
