@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || ''
 const FALLBACK_ADMIN_EMAIL = 'cegweb26@gmail.com'
@@ -126,6 +127,50 @@ async function sendPush(externalIds: string[], heading: string, message: string,
     heading,
     message,
     data
+  }
+}
+
+
+
+function createAdminClient() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  if (!supabaseUrl || !serviceRoleKey) return null
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+async function writeLog(kind: string, payload: Record<string, unknown>, subject: string, results: unknown[]) {
+  try {
+    const admin = createAdminClient()
+    if (!admin) return
+
+    const recipient = String(
+      payload.utas_email || payload.email || payload.sofor_email || payload.driver_email || ''
+    )
+
+    const emailResult = (results || []).find((x: any) => x?.channel === 'email') as any
+    const smsResult = (results || []).find((x: any) => x?.channel === 'sms') as any
+    const pushResult = (results || []).find((x: any) => x?.channel === 'push') as any
+
+    await admin.from('email_naplo').insert([{
+      tipus: kind || 'ismeretlen',
+      cel_email: recipient,
+      statusz: emailResult?.ok ? 'elkuldve' : (emailResult?.skipped ? 'kihagyva' : 'sikertelen'),
+      sikeres: !!emailResult?.ok,
+      targy: subject || kind || 'ertesites',
+      payload: {
+        ...(payload || {}),
+        sms_ok: !!smsResult?.ok,
+        sms_skipped: !!smsResult?.skipped,
+        push_ok: !!pushResult?.ok,
+        push_skipped: !!pushResult?.skipped,
+      },
+    }])
+  } catch (err) {
+    console.warn('email_naplo log hiba:', err)
   }
 }
 
@@ -275,6 +320,8 @@ serve(async (req) => {
 
     const emailFailures = results.filter((x: any) => x.channel === 'email' && !x.ok && !x.skipped)
     const mainSubject = (notification.emails && notification.emails[0]?.subject) || kind
+
+    await writeLog(kind, payload, mainSubject, results)
 
     return new Response(JSON.stringify({
       ok: emailFailures.length === 0,

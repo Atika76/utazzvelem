@@ -28,3 +28,9 @@ ONESIGNAL_API_KEY=OneSignal REST API Key
 SITE_URL=https://fuvarvelunk.hu
 
 A push ikon: assets/onesignal-push-icon.png
+
+
+OneSignal fontos fájlok a gyökérben:
+- OneSignalSDKWorker.js
+- OneSignalSDKUpdaterWorker.js
+Ezeket már beletettem a ZIP-be, ezért csak felül kell írni a GitHubon.
