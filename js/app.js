@@ -516,23 +516,82 @@ const App = (() => {
     }
   }
 
-  async function fetchSettings() {
+  const LOCAL_SETTINGS_KEY = 'fv_site_settings_local';
+
+  function readLocalSettings() {
     try {
-      const { data } = await sb.from(tableSettings).select('*').order('id', { ascending: true }).limit(1).maybeSingle();
-      return data || null;
+      const raw = localStorage.getItem(LOCAL_SETTINGS_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
     } catch (_) {
       return null;
     }
   }
 
+  function writeLocalSettings(payload) {
+    try {
+      localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(payload || {}));
+    } catch (_) {}
+  }
+
+  async function fetchSettings() {
+    const local = readLocalSettings();
+    try {
+      const { data } = await sb.from(tableSettings).select('*').order('id', { ascending: true }).limit(1).maybeSingle();
+      return { ...(local || {}), ...(data || {}) };
+    } catch (_) {
+      return local || null;
+    }
+  }
+
+  async function saveSettingsPayload(payload, existingId = null) {
+    const clean = {
+      site_name: String(payload?.site_name || '').trim(),
+      company_name: String(payload?.company_name || '').trim(),
+      contact_email: String(payload?.contact_email || '').trim(),
+      admin_email: String(payload?.admin_email || '').trim(),
+      description: String(payload?.description || '').trim()
+    };
+
+    writeLocalSettings(clean);
+
+    const variants = [
+      { ...clean, id: existingId || 1 },
+      clean,
+      {
+        site_name: clean.site_name,
+        company_name: clean.company_name,
+        contact_email: clean.contact_email,
+        admin_email: clean.admin_email
+      }
+    ];
+
+    for (const variant of variants) {
+      try {
+        let error = null;
+        if (existingId) {
+          ({ error } = await sb.from(tableSettings).update(variant).eq('id', existingId));
+          if (!error) return { ok: true, mode: 'database' };
+        }
+        ({ error } = await sb.from(tableSettings).upsert([variant]));
+        if (!error) return { ok: true, mode: 'database' };
+      } catch (_) {}
+    }
+
+    return { ok: true, mode: 'local' };
+  }
+
   async function applySettings() {
     const s = await fetchSettings();
+    const brandName = s?.site_name || APP_CONFIG.brandName;
+    const companyName = s?.company_name || APP_CONFIG.companyName;
     const visibleEmail = s?.contact_email || APP_CONFIG.contactEmail;
-    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = APP_CONFIG.brandName);
-    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = APP_CONFIG.companyName);
+    document.querySelectorAll('[data-setting="siteName"]').forEach(el => el.textContent = brandName);
+    document.querySelectorAll('[data-setting="companyName"]').forEach(el => el.textContent = companyName);
     document.querySelectorAll('[data-setting="email"]').forEach(el => el.textContent = visibleEmail);
     document.querySelectorAll('[data-setting="adminEmail"]').forEach(el => el.textContent = s?.admin_email || APP_CONFIG.adminEmail);
-    document.querySelectorAll('[data-brand]').forEach(el => el.textContent = APP_CONFIG.brandName);
+    document.querySelectorAll('[data-brand]').forEach(el => el.textContent = brandName);
   }
 
   async function fetchApprovedTrips(filters = {}) {
@@ -719,7 +778,7 @@ const App = (() => {
           ${ownTripNotice}
           <div class="trip-contact">
             <div><strong>Sofőr:</strong> ${escapeHtml(trip.nev || '')}</div>
-            <div><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</div>
+            <div><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}</div>
             <div><strong>Elfogadott fizetés:</strong> ${escapeHtml(paymentMethods)}</div>
             ${trip.bankszamla ? `<div><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla)}</div>` : ''}
           </div>
@@ -1347,8 +1406,8 @@ const App = (() => {
     const msg = document.getElementById('settingsMsg');
     const settings = await fetchSettings();
     if (settingsForm) {
-      settingsForm.siteName.value = APP_CONFIG.brandName;
-      settingsForm.companyName.value = APP_CONFIG.companyName;
+      settingsForm.siteName.value = settings?.site_name || APP_CONFIG.brandName;
+      settingsForm.companyName.value = settings?.company_name || APP_CONFIG.companyName;
       settingsForm.email.value = settings?.contact_email || APP_CONFIG.contactEmail;
       settingsForm.adminEmail.value = settings?.admin_email || APP_CONFIG.adminEmail;
       settingsForm.description.value = settings?.description || 'Gyors és biztonságos fuvarmegosztó felület utasoknak és sofőröknek.';
@@ -1356,11 +1415,19 @@ const App = (() => {
         e.preventDefault();
         const fd = new FormData(settingsForm);
         msg.textContent = 'Mentés...';
-        const payload = { site_name: fd.get('siteName'), company_name: fd.get('companyName'), contact_email: fd.get('email'), admin_email: fd.get('adminEmail'), description: fd.get('description') };
-        let error = null;
-        if (settings?.id) ({ error } = await sb.from(tableSettings).update(payload).eq('id', settings.id));
-        else ({ error } = await sb.from(tableSettings).insert([payload]));
-        msg.textContent = error ? 'Nem sikerült menteni.' : 'Mentve.';
+        const payload = {
+          site_name: fd.get('siteName'),
+          company_name: fd.get('companyName'),
+          contact_email: fd.get('email'),
+          admin_email: fd.get('adminEmail'),
+          description: fd.get('description')
+        };
+        const result = await saveSettingsPayload(payload, settings?.id || null);
+        try { await AppAuth.fetchAdminEmail(true); } catch (_) {}
+        await applySettings();
+        msg.textContent = result.mode === 'database'
+          ? 'Mentve az adatbázisba.'
+          : 'Helyileg mentve. A Supabase mentést még be kell kapcsolni.';
       });
     }
     const statHost = document.createElement('div');
@@ -1591,7 +1658,7 @@ const App = (() => {
       <section class="card detail-extra">
         <div class="section-head"><div><span class="eyebrow">Sofőr profil</span><h2 style="margin:12px 0 0">${escapeHtml(trip.nev || '')}</h2></div><a class="btn btn-secondary" href="driver.html?name=${encodeURIComponent(trip.nev || '')}&email=${encodeURIComponent(trip.email || '')}">Sofőr profil</a></div>
         <p>${starRating(trip.sofor_atlag || 0, trip.sofor_ertekeles_db || 0)}</p>
-        <p><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p>
+        <p><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}</p>
         <p><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla || '-')}</p>
       </section>
       <section class="two-col" style="margin-top:18px">

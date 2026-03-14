@@ -1,0 +1,15 @@
+FUVARVELUNK JAVÍTÁSOK
+
+Ebben a ZIP-ben javítva lett:
+- a telefonszám nem jelenik meg nyilvánosan a fuvar kártyán és a nyilvános részleteknél
+- az admin Beállítások mentése már nem csak kiírja, hogy mentve
+- először megpróbál adatbázisba menteni
+- ha a Supabase mentés még nincs teljesen kész, akkor legalább helyileg elmenti a böngészőben
+- a mentett weboldalnév / cégnév / email újratöltés után is visszajön ugyanabban a böngészőben
+
+AMIHEZ MÉG KELL A SUPABASE OLDALON BEÁLLÍTÁS:
+- a beallitasok tábla írási joga (RLS / policy)
+- ha kell, a description oszlop
+- OneSignal és Edge Function secret-ek a push küldéshez
+
+A push logika a projektben benne van, de a tényleges küldéshez a Supabase oldali beállításoknak is rendben kell lenniük.
