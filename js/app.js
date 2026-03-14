@@ -732,12 +732,20 @@ const App = (() => {
       </article>`;
   }
 
+  function bookingIsLocked(b = {}) {
+    const foglalas = String(b.foglalasi_allapot || '').trim().toLowerCase();
+    const fizetes = String(b.fizetesi_allapot || '').trim().toLowerCase();
+    return ['jóváhagyva', 'jovahagyva'].includes(foglalas) && fizetes === 'fizetve';
+  }
+
   function bookingCard(b, tripMap = {}, options = {}) {
     const trip = tripMap[String(b.fuvar_id ?? b.trip_id ?? '')] || {};
     const compact = !!options.compact;
     const status = String(b.foglalasi_allapot || 'Új').toLowerCase();
+    const isLocked = bookingIsLocked(b);
     const showApprove = !['jóváhagyva','jovahagyva','elutasítva','elutasitva'].includes(status);
-    const showPaid = String(b.fizetesi_allapot || '').toLowerCase() !== 'fizetve';
+    const showPaid = !isLocked && String(b.fizetesi_allapot || '').toLowerCase() !== 'fizetve';
+    const showDelete = !!currentViewer.admin || !isLocked;
     return `
       <article class="card admin-item${compact ? ' driver-booking-card' : ''}">
         <div>
@@ -760,7 +768,7 @@ const App = (() => {
         <div class="trip-actions">
           ${showApprove ? `<button class="btn btn-success js-booking-approve" data-id="${b.id}" data-trip-id="${b.fuvar_id ?? b.trip_id ?? ''}" data-seats="${b.foglalt_helyek || 1}">Jóváhagyás</button>` : ''}
           ${showPaid ? `<button class="btn btn-warning js-booking-paid" data-id="${b.id}">Fizetve</button>` : ''}
-          <button class="btn btn-danger js-booking-cancel" data-id="${b.id}">${showApprove ? 'Elutasítás / törlés' : 'Törlés'}</button>
+          ${showDelete ? `<button class="btn btn-danger js-booking-cancel" data-id="${b.id}">${showApprove ? 'Elutasítás / törlés' : 'Törlés'}</button>` : '<div class="notice">Ez a foglalás már véglegesített, nem törölhető.</div>'}
         </div>
       </article>`;
   }
@@ -1049,7 +1057,15 @@ const App = (() => {
       const paidBooking = e.target.closest('.js-booking-paid');
       if (paidBooking) { await sb.from(tableBookings).update({ fizetesi_allapot: 'Fizetve', foglalasi_allapot: 'Jóváhagyva' }).eq('id', paidBooking.dataset.id); location.reload(); return; }
       const cancelBooking = e.target.closest('.js-booking-cancel');
-      if (cancelBooking) { if (confirm('Biztosan törlöd ezt a foglalást?')) { await sb.from(tableBookings).delete().eq('id', cancelBooking.dataset.id); location.reload(); } return; }
+      if (cancelBooking) {
+        const { data: bookingRow } = await sb.from(tableBookings).select('*').eq('id', cancelBooking.dataset.id).maybeSingle();
+        if (!currentViewer.admin && bookingRow && bookingIsLocked(bookingRow)) {
+          alert('A jóváhagyott és fizetett foglalást a sofőr már nem törölheti.');
+          return;
+        }
+        if (confirm('Biztosan törlöd ezt a foglalást?')) { await sb.from(tableBookings).delete().eq('id', cancelBooking.dataset.id); location.reload(); }
+        return;
+      }
     });
   }
 
