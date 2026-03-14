@@ -45,7 +45,11 @@ const App = (() => {
 
   function seatCounts(trip) {
     const total = Number(trip.osszes_hely ?? trip.auto_helyek ?? trip.helyek ?? 0);
-    const free = Math.max(0, Number(trip.szabad_helyek ?? trip.helyek ?? total ?? 0));
+    const booked = Number(trip.booked_seats ?? trip.foglalt_helyek_osszesen ?? NaN);
+    const hasBooked = Number.isFinite(booked);
+    const freeFromBooking = hasBooked ? Math.max(0, total - booked) : NaN;
+    const freeStored = Math.max(0, Number(trip.szabad_helyek ?? trip.helyek ?? total ?? 0));
+    const free = hasBooked ? freeFromBooking : freeStored;
     return { total: Math.max(total, free), free };
   }
 
@@ -139,6 +143,8 @@ const App = (() => {
   }
 
   function tripHasBookings(trip = {}) {
+    if (typeof trip.has_bookings === 'boolean') return trip.has_bookings;
+    if (Number.isFinite(Number(trip.booked_seats))) return Number(trip.booked_seats) > 0;
     const { total, free } = seatCounts(trip);
     return Math.max(0, total - free) > 0;
   }
@@ -524,6 +530,36 @@ const App = (() => {
     const { data, error } = await sb.from(tableBookings).select('*').order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
+  }
+
+
+  function bookingCountsMap(bookings = []) {
+    const map = {};
+    bookings.forEach(b => {
+      const status = String(b.foglalasi_allapot || '').trim().toLowerCase();
+      if (['elutasítva', 'elutasitva', 'törölve', 'torolve', 'lemondva', 'cancelled'].includes(status)) return;
+      const key = String(b.fuvar_id ?? b.trip_id ?? '');
+      if (!key) return;
+      const seats = Number(b.foglalt_helyek || b.helyek || 1) || 1;
+      map[key] = (map[key] || 0) + seats;
+    });
+    return map;
+  }
+
+  async function enrichTripsWithBookings(trips) {
+    if (!trips || !trips.length) return trips || [];
+    let bookings = [];
+    try {
+      bookings = await fetchBookings();
+    } catch (_) {
+      bookings = [];
+    }
+    const counts = bookingCountsMap(bookings);
+    return trips.map(trip => ({
+      ...trip,
+      booked_seats: Number(counts[String(trip.id)] || 0),
+      has_bookings: Number(counts[String(trip.id)] || 0) > 0
+    }));
   }
 
   async function fetchRatingsForTrip(tripId, tipus = null) {
@@ -1021,7 +1057,7 @@ const App = (() => {
     const featured = document.getElementById('featuredTrips');
     if (!featured) return;
     try {
-      const trips = (await enrichTripsWithRatings(await fetchApprovedTrips({}))).slice(0, 6);
+      const trips = (await enrichTripsWithRatings(await enrichTripsWithBookings(await fetchApprovedTrips({})))).slice(0, 6);
       featured.innerHTML = trips.length ? trips.map(t => `
         <article class="card">
           ${tripGalleryMarkup(t, true)}
@@ -1074,11 +1110,11 @@ const App = (() => {
       if (recWrap) recWrap.innerHTML = '';
       try {
         const filters = { origin: originInput.value.trim(), destination: destinationInput.value.trim(), date: dateInput.value, maxPrice: maxPriceInput?.value || '', dayPreset: dayPresetInput?.value || '', sort: sortInput?.value || 'time_asc', onlyFree: !!onlyFreeInput?.checked };
-        const trips = await enrichTripsWithRatings(await fetchApprovedTrips(filters));
+        const trips = await enrichTripsWithRatings(await enrichTripsWithBookings(await fetchApprovedTrips(filters)));
         list.innerHTML = trips.length ? trips.map(t => tripListCard(t)).join('') : '<div class="empty-state">Nincs a keresésnek megfelelő fuvar.</div>';
         if (trips[0]) await focusRoute(trips[0].indulas, trips[0].erkezes);
         if (!trips.length && recWrap) {
-          const all = await enrichTripsWithRatings(await fetchApprovedTrips({}));
+          const all = await enrichTripsWithRatings(await enrichTripsWithBookings(await fetchApprovedTrips({})));
           const rec = buildRecommendations(all, filters);
           recWrap.innerHTML = rec.length ? `<h3>Ajánlott fuvarok</h3><div class="trip-list-grid">${rec.map(t => tripListCard(t)).join('')}</div>` : '';
         }
@@ -1203,7 +1239,8 @@ const App = (() => {
     statHost.style.marginBottom = '18px';
     tripsWrap.before(statHost);
     try {
-      const [allTrips, bookings, ratings, emailLogs] = await Promise.all([fetchAllTrips(), fetchBookings(), sb.from(tableRatings).select('id'), fetchEmailLogs()]);
+      const [allTripsRaw, bookings, ratings, emailLogs] = await Promise.all([fetchAllTrips(), fetchBookings(), sb.from(tableRatings).select('id'), fetchEmailLogs()]);
+      const allTrips = await enrichTripsWithBookings(allTripsRaw);
       const liveTrips = allTrips.filter(t => !isTripExpired(t));
       const approved = allTrips.filter(t => t.statusz === 'Jóváhagyva').length;
       const pending = allTrips.filter(t => t.statusz !== 'Jóváhagyva' && t.statusz !== 'Betelt').length;
@@ -1236,7 +1273,7 @@ const App = (() => {
     const params = new URLSearchParams(location.search);
     const email = params.get('email');
     const name = params.get('name');
-    const allTrips = await enrichTripsWithRatings(await fetchApprovedTrips({}).catch(() => []));
+    const allTrips = await enrichTripsWithRatings(await enrichTripsWithBookings(await fetchApprovedTrips({}).catch(() => [])));
     const trips = allTrips.filter(t => (email && t.email === email) || (name && t.nev === name));
     const trip = trips[0] || { nev: name || 'Ismeretlen sofőr', email: email || '', telefon: '' };
     box.innerHTML = `
@@ -1364,75 +1401,85 @@ const App = (() => {
     if (!wrap) return;
     const id = new URLSearchParams(location.search).get('id');
     if (!id) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
+
+    let trip;
+    let driverReviews = [];
+    let tripReviews = [];
+    let tripBookings = [];
+    let isManagerView = false;
     try {
       const tripRaw = await fetchTripById(id);
       if (!tripRaw) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
-      const [trip] = await enrichTripsWithRatings([tripRaw]);
-      const isManagerView = !!(currentViewer.admin || isOwnTrip(trip));
-      const [driverReviews, tripReviews, tripBookings] = await Promise.all([
+      [trip] = await enrichTripsWithRatings(await enrichTripsWithBookings([tripRaw]));
+      isManagerView = !!(currentViewer.admin || isOwnTrip(trip));
+      [driverReviews, tripReviews, tripBookings] = await Promise.all([
         fetchRatingsForTrip(trip.id, 'sofor'),
         fetchRatingsForTrip(trip.id, 'utazas'),
         isManagerView ? fetchBookingsForTrip(trip.id) : Promise.resolve([])
       ]);
-      wrap.innerHTML = `
-        ${tripCard(trip, false)}
-        ${isManagerView ? buildDriverBookingsSection(trip, tripBookings) : ''}
-        <section class="card detail-extra">
-          <div class="section-head"><div><span class="eyebrow">Sofőr profil</span><h2 style="margin:12px 0 0">${escapeHtml(trip.nev || '')}</h2></div><a class="btn btn-secondary" href="driver.html?name=${encodeURIComponent(trip.nev || '')}&email=${encodeURIComponent(trip.email || '')}">Sofőr profil</a></div>
-          <p>${starRating(trip.sofor_atlag || 0, trip.sofor_ertekeles_db || 0)}</p>
-          <p><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p>
-          <p><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla || '-')}</p>
-        </section>
-        <section class="two-col" style="margin-top:18px">
-          <section class="card"><h2>Sofőr értékelései</h2>${driverReviews.length ? driverReviews.map(reviewCard).join('') : '<div class="notice">Még nincs értékelés.</div>'}
-            <div id="selfRatingNoticeDriver" class="notice hidden" style="margin-top:18px">A saját fuvarodat és saját magadat nem értékelheted.</div>
-            <form id="driverRatingForm" class="form-stack" style="margin-top:18px">
-              <input type="text" name="website" class="hidden" autocomplete="off" tabindex="-1">
-              <h3>Sofőr értékelése</h3>
-              <div class="grid-2"><label><span>Név</span><input name="name" required placeholder="A neved"></label><label><span>Csillag (1-5)</span><input name="csillag" type="number" min="1" max="5" required></label></div>
-              <label><span>Szöveges értékelés (nem kötelező)</span><textarea name="szoveg" placeholder="Írd le röviden a tapasztalatodat (nem kötelező)"></textarea></label>
-              <div class="form-message" id="driverRatingMsg"></div>
-              <button class="btn btn-primary" type="submit">Értékelés mentése</button>
-            </form>
-          </section>
-          <section class="card"><h2>Utazás értékelései</h2>${tripReviews.length ? tripReviews.map(reviewCard).join('') : '<div class="notice">Még nincs értékelés.</div>'}
-            <div id="selfRatingNoticeTrip" class="notice hidden" style="margin-top:18px">A saját fuvarodat és saját magadat nem értékelheted.</div>
-            <form id="tripRatingForm" class="form-stack" style="margin-top:18px">
-              <input type="text" name="website" class="hidden" autocomplete="off" tabindex="-1">
-              <h3>Utazás értékelése</h3>
-              <div class="grid-2"><label><span>Név</span><input name="name" required placeholder="A neved"></label><label><span>Csillag (1-5)</span><input name="csillag" type="number" min="1" max="5" required></label></div>
-              <label><span>Szöveges értékelés (nem kötelező)</span><textarea name="szoveg" placeholder="Írd le röviden a tapasztalatodat (nem kötelező)"></textarea></label>
-              <div class="form-message" id="tripRatingMsg"></div>
-              <button class="btn btn-primary" type="submit">Értékelés mentése</button>
-            </form>
-          </section>
-        </section>`;
-      await focusRoute(trip.indulas, trip.erkezes);
-      const session = await AppAuth.getSession();
-      const currentEmail = (session?.user?.email || '').trim().toLowerCase();
-      const tripEmail = (trip?.email || '').trim().toLowerCase();
-      const isOwnTrip = !!currentEmail && !!tripEmail && currentEmail === tripEmail;
-      if (isOwnTrip) {
-        document.getElementById('driverRatingForm')?.classList.add('hidden');
-        document.getElementById('tripRatingForm')?.classList.add('hidden');
-        document.getElementById('selfRatingNoticeDriver')?.classList.remove('hidden');
-        document.getElementById('selfRatingNoticeTrip')?.classList.remove('hidden');
-      }
-      document.getElementById('driverRatingForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msg = document.getElementById('driverRatingMsg');
-        msg.textContent = 'Mentés...';
-        try { await submitRating(trip, e.currentTarget, 'sofor'); msg.textContent = 'Elmentve.'; setTimeout(() => location.reload(), 700); } catch (err) { msg.textContent = err.message || 'Nem sikerült menteni.'; }
-      });
-      document.getElementById('tripRatingForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msg = document.getElementById('tripRatingMsg');
-        msg.textContent = 'Mentés...';
-        try { await submitRating(trip, e.currentTarget, 'utazas'); msg.textContent = 'Elmentve.'; setTimeout(() => location.reload(), 700); } catch (err) { msg.textContent = err.message || 'Nem sikerült menteni.'; }
-      });
-    } catch (_) {
+    } catch (err) {
+      console.error('Trip detail load failed', err);
       wrap.innerHTML = '<div class="empty-state">A fuvar betöltése nem sikerült.</div>';
+      return;
     }
+
+    wrap.innerHTML = `
+      ${tripCard(trip, false)}
+      ${isManagerView ? buildDriverBookingsSection(trip, tripBookings) : ''}
+      <section class="card detail-extra">
+        <div class="section-head"><div><span class="eyebrow">Sofőr profil</span><h2 style="margin:12px 0 0">${escapeHtml(trip.nev || '')}</h2></div><a class="btn btn-secondary" href="driver.html?name=${encodeURIComponent(trip.nev || '')}&email=${encodeURIComponent(trip.email || '')}">Sofőr profil</a></div>
+        <p>${starRating(trip.sofor_atlag || 0, trip.sofor_ertekeles_db || 0)}</p>
+        <p><strong>Kapcsolat:</strong> ${escapeHtml(trip.email || '')}${trip.telefon ? ' · ' + escapeHtml(trip.telefon) : ''}</p>
+        <p><strong>Utalási adat:</strong> ${escapeHtml(trip.bankszamla || '-')}</p>
+      </section>
+      <section class="two-col" style="margin-top:18px">
+        <section class="card"><h2>Sofőr értékelései</h2>${driverReviews.length ? driverReviews.map(reviewCard).join('') : '<div class="notice">Még nincs értékelés.</div>'}
+          <div id="selfRatingNoticeDriver" class="notice hidden" style="margin-top:18px">A saját fuvarodat és saját magadat nem értékelheted.</div>
+          <form id="driverRatingForm" class="form-stack" style="margin-top:18px">
+            <input type="text" name="website" class="hidden" autocomplete="off" tabindex="-1">
+            <h3>Sofőr értékelése</h3>
+            <div class="grid-2"><label><span>Név</span><input name="name" required placeholder="A neved"></label><label><span>Csillag (1-5)</span><input name="csillag" type="number" min="1" max="5" required></label></div>
+            <label><span>Szöveges értékelés (nem kötelező)</span><textarea name="szoveg" placeholder="Írd le röviden a tapasztalatodat (nem kötelező)"></textarea></label>
+            <div class="form-message" id="driverRatingMsg"></div>
+            <button class="btn btn-primary" type="submit">Értékelés mentése</button>
+          </form>
+        </section>
+        <section class="card"><h2>Utazás értékelései</h2>${tripReviews.length ? tripReviews.map(reviewCard).join('') : '<div class="notice">Még nincs értékelés.</div>'}
+          <div id="selfRatingNoticeTrip" class="notice hidden" style="margin-top:18px">A saját fuvarodat és saját magadat nem értékelheted.</div>
+          <form id="tripRatingForm" class="form-stack" style="margin-top:18px">
+            <input type="text" name="website" class="hidden" autocomplete="off" tabindex="-1">
+            <h3>Utazás értékelése</h3>
+            <div class="grid-2"><label><span>Név</span><input name="name" required placeholder="A neved"></label><label><span>Csillag (1-5)</span><input name="csillag" type="number" min="1" max="5" required></label></div>
+            <label><span>Szöveges értékelés (nem kötelező)</span><textarea name="szoveg" placeholder="Írd le röviden a tapasztalatodat (nem kötelező)"></textarea></label>
+            <div class="form-message" id="tripRatingMsg"></div>
+            <button class="btn btn-primary" type="submit">Értékelés mentése</button>
+          </form>
+        </section>
+      </section>`;
+
+    try { await focusRoute(trip.indulas, trip.erkezes); } catch (err) { console.warn('Map focus failed', err); }
+    const session = await AppAuth.getSession();
+    const currentEmail = (session?.user?.email || '').trim().toLowerCase();
+    const tripEmail = (trip?.email || '').trim().toLowerCase();
+    const ownTrip = !!currentEmail && !!tripEmail && currentEmail === tripEmail;
+    if (ownTrip) {
+      document.getElementById('driverRatingForm')?.classList.add('hidden');
+      document.getElementById('tripRatingForm')?.classList.add('hidden');
+      document.getElementById('selfRatingNoticeDriver')?.classList.remove('hidden');
+      document.getElementById('selfRatingNoticeTrip')?.classList.remove('hidden');
+    }
+    document.getElementById('driverRatingForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('driverRatingMsg');
+      msg.textContent = 'Mentés...';
+      try { await submitRating(trip, e.currentTarget, 'sofor'); msg.textContent = 'Elmentve.'; setTimeout(() => location.reload(), 700); } catch (err) { msg.textContent = err.message || 'Nem sikerült menteni.'; }
+    });
+    document.getElementById('tripRatingForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('tripRatingMsg');
+      msg.textContent = 'Mentés...';
+      try { await submitRating(trip, e.currentTarget, 'utazas'); msg.textContent = 'Elmentve.'; setTimeout(() => location.reload(), 700); } catch (err) { msg.textContent = err.message || 'Nem sikerült menteni.'; }
+    });
   }
 
   async function init() {
