@@ -280,3 +280,39 @@ code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px}
 @media (max-width: 860px){
   #driverTrips .trip-tools{grid-template-columns:1fr}
 }
+
+
+.upload-preview-item{
+  position:relative;
+  display:inline-block;
+}
+.upload-preview-item img{
+  display:block;
+}
+.upload-remove-btn{
+  position:absolute;
+  top:8px;
+  right:8px;
+  width:28px;
+  height:28px;
+  border:none;
+  border-radius:8px;
+  background:#dc2626;
+  color:#fff;
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
+  box-shadow:0 8px 20px rgba(0,0,0,.18);
+}
+.upload-remove-btn:hover{
+  transform:scale(1.04);
+}
+.upload-preview-single,
+.upload-preview{
+  gap:12px;
+}
+#driverTrips .trip-compact h3,
+#driverTrips .trip-card h3{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
