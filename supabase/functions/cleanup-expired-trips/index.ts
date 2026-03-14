@@ -31,6 +31,10 @@ function normPhone(value?: string | null) {
   return raw.replace(/\D/g, '')
 }
 
+function normExternalId(value?: string | null) {
+  return String(value || '').trim().toLowerCase()
+}
+
 async function sendEmail(resendApiKey: string, to: string, subject: string, html: string) {
   if (!resendApiKey || !to) return { ok: false, skipped: true }
   const resp = await fetch('https://api.resend.com/emails', {
@@ -58,6 +62,32 @@ async function sendSms(to: string, body: string) {
   return { ok: resp.ok, skipped: false, data: await resp.text() }
 }
 
+async function sendPush(externalIds: string[], heading: string, message: string, url?: string) {
+  const appId = Deno.env.get('ONESIGNAL_APP_ID') || ''
+  const apiKey = Deno.env.get('ONESIGNAL_API_KEY') || ''
+  const ids = [...new Set((externalIds || []).map(normExternalId).filter(Boolean))]
+  if (!appId || !apiKey || !ids.length) return { ok: false, skipped: true }
+
+  const resp = await fetch('https://api.onesignal.com/notifications', {
+    method: 'POST',
+    headers: {
+      Authorization: `Key ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      app_id: appId,
+      target_channel: 'push',
+      include_aliases: { external_id: ids },
+      headings: { hu: heading, en: heading },
+      contents: { hu: message, en: message },
+      url,
+      web_url: url,
+    }),
+  })
+
+  return { ok: resp.ok, skipped: false, data: await resp.text() }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ ok: false, message: 'Method not allowed' }, 405)
@@ -73,6 +103,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const resendApiKey = Deno.env.get('RESEND_API_KEY') || ''
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://fuvarvelunk.hu'
     if (!supabaseUrl || !serviceRoleKey) {
       return json({ ok: false, message: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }, 500)
     }
@@ -151,6 +182,7 @@ serve(async (req) => {
         const html = `<h2>Indulási emlékeztető</h2><p>Kedves ${trip.nev || 'Sofőr'}!</p><p>A fuvarod ${reminderWindowMinutes} percen belül indul.</p><p><strong>${trip.indulas || ''} → ${trip.erkezes || ''}</strong></p><p>Dátum: ${trip.datum || ''} ${trip.ido || ''}</p><p>Foglalások száma: ${bookingCount || 0}</p>`
         const emailRes = await sendEmail(resendApiKey, trip.email || '', subject, html)
         const smsRes = await sendSms(trip.telefon || '', `FuvarVelünk: a ${trip.indulas || ''} → ${trip.erkezes || ''} fuvarod ${Math.round(reminderWindowMinutes / 60)} órán belül indul. Foglalások: ${bookingCount || 0}.`)
+        const pushRes = await sendPush([trip.email || ''], 'Fuvar indul 2 órán belül', `${trip.indulas || ''} → ${trip.erkezes || ''} · foglalások: ${bookingCount || 0}`, `${siteUrl}/trip.html?id=${encodeURIComponent(String(trip.id || ''))}`)
 
         await admin.from('email_naplo').insert([{
           tipus: 'sofor_indulas_emlekezteto',
@@ -158,10 +190,24 @@ serve(async (req) => {
           statusz: emailRes.ok ? 'elkuldve' : (emailRes.skipped ? 'kihagyva' : 'sikertelen'),
           sikeres: !!emailRes.ok,
           targy: subject,
-          payload: { trip_id: trip.id, sms_ok: !!smsRes.ok, sms_skipped: !!smsRes.skipped, foglalas_db: bookingCount || 0 },
+          payload: {
+            trip_id: trip.id,
+            sms_ok: !!smsRes.ok,
+            sms_skipped: !!smsRes.skipped,
+            push_ok: !!pushRes.ok,
+            push_skipped: !!pushRes.skipped,
+            foglalas_db: bookingCount || 0,
+          },
         }])
 
-        reminderLogs.push({ trip_id: trip.id, email_ok: !!emailRes.ok, sms_ok: !!smsRes.ok, sms_skipped: !!smsRes.skipped })
+        reminderLogs.push({
+          trip_id: trip.id,
+          email_ok: !!emailRes.ok,
+          sms_ok: !!smsRes.ok,
+          sms_skipped: !!smsRes.skipped,
+          push_ok: !!pushRes.ok,
+          push_skipped: !!pushRes.skipped,
+        })
       }
     }
 

@@ -20,3 +20,11 @@ Stabil javítások:
 - Kapcsolat oldalon csak weboldal hibabejelentés marad
 - Fuvar feladásánál bankszámlaszám mező
 - Fizetési módok: Utalás a sofőrnek / Készpénz a sofőrnek
+
+
+PUSH / ONESIGNAL:
+ONESIGNAL_APP_ID=04a02749-13bd-4060-9559-f0808ee9f927
+ONESIGNAL_API_KEY=OneSignal REST API Key
+SITE_URL=https://fuvarvelunk.hu
+
+A push ikon: assets/onesignal-push-icon.png
