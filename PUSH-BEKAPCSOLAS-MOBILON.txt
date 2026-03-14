@@ -1,0 +1,2 @@
+Ha a push nem jon fel automatikusan, belettem egy alul megjeleno gombot: "Push ertesitesek bekapcsolasa".
+Nyisd meg telefonon a weboldalt bejelentkezve, es nyomd meg ezt a gombot Chrome-ban.

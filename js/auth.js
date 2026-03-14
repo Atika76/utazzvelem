@@ -130,6 +130,64 @@ window.AppAuth = (() => {
     return oneSignalBootPromise;
   }
 
+  async function ensurePushPromptButton(OneSignal, email) {
+    try {
+      const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+      if (permission === 'granted') {
+        const old = document.getElementById('pushEnableBar');
+        if (old) old.remove();
+        return;
+      }
+
+      let bar = document.getElementById('pushEnableBar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'pushEnableBar';
+        bar.className = 'push-enable-bar';
+        bar.innerHTML = `
+          <div class="push-enable-text">Kapcsold be a push értesítéseket, hogy azonnal lásd a foglalásokat és jóváhagyásokat.</div>
+          <button type="button" class="btn btn-primary push-enable-btn">Push értesítések bekapcsolása</button>
+        `;
+        document.body.appendChild(bar);
+      }
+
+      const btn = bar.querySelector('.push-enable-btn');
+      if (btn && !btn.dataset.bound) {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', async () => {
+          try {
+            btn.disabled = true;
+            btn.textContent = 'Engedélykérés...';
+            if (OneSignal.Notifications?.requestPermission) {
+              await OneSignal.Notifications.requestPermission();
+            }
+            const current = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+            if (current === 'granted') {
+              try {
+                await OneSignal.login(email);
+                if (OneSignal.User?.addTag) {
+                  await OneSignal.User.addTag('email', email);
+                }
+              } catch (_) {}
+              bar.remove();
+              showToast('Push értesítések engedélyezve.');
+            } else {
+              btn.disabled = false;
+              btn.textContent = 'Push értesítések bekapcsolása';
+              showToast('Az értesítések még nincsenek engedélyezve.');
+            }
+          } catch (err) {
+            console.warn('Push gomb hiba:', err);
+            btn.disabled = false;
+            btn.textContent = 'Push értesítések bekapcsolása';
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Push sáv hiba:', err);
+    }
+  }
+
   async function syncOneSignalUser(user) {
     if (!ONESIGNAL_APP_ID) return;
     try {
@@ -138,11 +196,17 @@ window.AppAuth = (() => {
 
       const email = String(user?.email || '').trim().toLowerCase();
       if (!email) {
-        await OneSignal.logout();
+        try { await OneSignal.logout(); } catch (_) {}
+        const old = document.getElementById('pushEnableBar');
+        if (old) old.remove();
         return;
       }
 
-      await OneSignal.login(email);
+      try {
+        await OneSignal.login(email);
+      } catch (loginErr) {
+        console.warn('OneSignal login hiba:', loginErr);
+      }
 
       try {
         if (OneSignal.User?.addTag) {
@@ -153,18 +217,7 @@ window.AppAuth = (() => {
         console.warn('OneSignal tag mentési hiba:', tagErr);
       }
 
-      try {
-        const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-        if (permission !== 'granted') {
-          const alreadyPrompted = sessionStorage.getItem(ONESIGNAL_PROMPT_KEY) === '1';
-          if (!alreadyPrompted && OneSignal.Notifications?.requestPermission) {
-            sessionStorage.setItem(ONESIGNAL_PROMPT_KEY, '1');
-            await OneSignal.Notifications.requestPermission();
-          }
-        }
-      } catch (permErr) {
-        console.warn('OneSignal jogosultságkérés hiba:', permErr);
-      }
+      await ensurePushPromptButton(OneSignal, email);
     } catch (err) {
       console.warn('OneSignal felhasználó-szinkron hiba:', err);
     }

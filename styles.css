@@ -316,3 +316,23 @@ code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px}
   overflow-wrap:anywhere;
   word-break:break-word;
 }
+
+
+/* ===== Push engedélykérő sáv ===== */
+.push-enable-bar{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:18px;background:rgba(8,20,44,.97);border:1px solid rgba(102,164,255,.28);box-shadow:0 18px 40px rgba(0,0,0,.35)}
+.push-enable-text{color:#eef4ff;font-weight:700;line-height:1.35;flex:1}
+.push-enable-btn{white-space:nowrap}
+@media (max-width: 720px){
+  .push-enable-bar{flex-direction:column;align-items:stretch;bottom:10px;left:10px;right:10px;padding:14px}
+  .push-enable-btn{width:100%}
+}
+
+/* ===== Mobil fejléc javítás ===== */
+@media (max-width: 720px){
+  .site-header{position:sticky;top:0;z-index:50}
+  .nav{min-height:unset;flex-direction:column;align-items:flex-start;padding:12px 0}
+  .nav nav{width:100%;display:flex;flex-wrap:wrap;justify-content:flex-start}
+  .nav nav a,.nav nav button,.nav-user{min-height:44px}
+  main.container{padding-top:14px}
+  .hero{padding-top:10px}
+}
