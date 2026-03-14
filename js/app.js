@@ -138,6 +138,15 @@ const App = (() => {
     return !!(currentViewer.admin || isOwnTrip(trip));
   }
 
+  function tripHasBookings(trip = {}) {
+    const { total, free } = seatCounts(trip);
+    return Math.max(0, total - free) > 0;
+  }
+
+  function ownerCanEditOrDeleteTrip(trip = {}) {
+    return !!(!currentViewer.admin && isOwnTrip(trip) && !tripHasBookings(trip));
+  }
+
   function buildGoogleMapsDirectionsUrl(origin, destination) {
     const from = [String(origin || '').trim(), 'Magyarország'].filter(Boolean).join(', ');
     const to = [String(destination || '').trim(), 'Magyarország'].filter(Boolean).join(', ');
@@ -607,7 +616,7 @@ const App = (() => {
       : ['transfer', 'cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
     const ratingHtml = starRating(trip.sofor_atlag || trip.sofor_ertekeles || 0, trip.sofor_ertekeles_db || 0);
     const fullBadge = free <= 0 ? '<span class="status rejected">Betelt</span><span class="status info">Már nem foglalható</span>' : '';
-    const manager = !admin && canManageTrip(trip);
+    const manager = !admin && ownerCanEditOrDeleteTrip(trip);
     return `
       <article class="card trip-card" data-trip-id="${trip.id}">
         <div class="trip-main">
@@ -666,7 +675,7 @@ const App = (() => {
     const { total, free } = seatCounts(trip);
     const ratingHtml = starRating(trip.sofor_atlag || trip.sofor_ertekeles || 0, trip.sofor_ertekeles_db || 0);
     const full = free <= 0;
-    const manager = canManageTrip(trip);
+    const manager = ownerCanEditOrDeleteTrip(trip);
     const isAdmin = !!currentViewer.admin;
     return `
       <article class="card trip-compact" data-trip-id="${trip.id}">
@@ -895,6 +904,13 @@ const App = (() => {
       if (editTripBtn) {
         const trip = await fetchTripById(editTripBtn.dataset.id);
         if (!trip || !canManageTrip(trip)) return;
+        if (!currentViewer.admin) {
+          const { count, error: countErr } = await sb.from(tableBookings).select('id', { count: 'exact', head: true }).eq('fuvar_id', trip.id);
+          if (!countErr && Number(count || 0) > 0) {
+            alert('Ez a fuvar már foglalást kapott, ezért már nem szerkeszthető. Kérlek, adminnal módosíttasd.');
+            return;
+          }
+        }
         const wrap = openModal(`
           <div class="section-head"><div><span class="eyebrow">Fuvar szerkesztése</span><h2 style="margin:8px 0 0">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</h2></div><button class="btn btn-secondary" data-close="1">Bezárás</button></div>
           <form id="tripEditForm" class="form-stack">
