@@ -138,6 +138,39 @@ const App = (() => {
     return !!(currentViewer.admin || isOwnTrip(trip));
   }
 
+  function isPendingTrip(trip = {}) {
+    return String(trip?.statusz || '').trim().toLowerCase() === 'függőben' || String(trip?.statusz || '').trim().toLowerCase() === 'fuggoben';
+  }
+
+  function sortTripsForAdmin(trips = []) {
+    return [...trips].sort((a, b) => {
+      const pendingDiff = Number(isPendingTrip(b)) - Number(isPendingTrip(a));
+      if (pendingDiff !== 0) return -pendingDiff;
+      const aTime = new Date(a?.created_at || a?.datum || 0).getTime() || 0;
+      const bTime = new Date(b?.created_at || b?.datum || 0).getTime() || 0;
+      return bTime - aTime;
+    });
+  }
+
+  function getHighlightTripId() {
+    try {
+      return new URLSearchParams(location.search).get('highlight') || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function applyAdminTripHighlight() {
+    const highlightId = getHighlightTripId();
+    if (!highlightId) return;
+    const card = document.querySelector(`[data-trip-id="${CSS.escape(highlightId)}"]`);
+    if (!card) return;
+    card.classList.add('trip-highlight');
+    setTimeout(() => {
+      try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+    }, 250);
+  }
+
   function buildGoogleMapsDirectionsUrl(origin, destination) {
     const from = [String(origin || '').trim(), 'Magyarország'].filter(Boolean).join(', ');
     const to = [String(destination || '').trim(), 'Magyarország'].filter(Boolean).join(', ');
@@ -608,6 +641,7 @@ const App = (() => {
     const ratingHtml = starRating(trip.sofor_atlag || trip.sofor_ertekeles || 0, trip.sofor_ertekeles_db || 0);
     const fullBadge = free <= 0 ? '<span class="status rejected">Betelt</span><span class="status info">Már nem foglalható</span>' : '';
     const manager = !admin && canManageTrip(trip);
+    const showGuestActions = !admin && !manager;
     return `
       <article class="card trip-card" data-trip-id="${trip.id}">
         <div class="trip-main">
@@ -650,8 +684,8 @@ const App = (() => {
             <button class="btn btn-warning js-trip-pending" data-id="${trip.id}">Függőben</button>
             <button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Törlés</button>
           ` : `
-            <button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${free < 1 ? 'disabled' : ''}>${free < 1 ? 'Betelt' : 'Foglalás'}</button>
-            <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>
+            ${showGuestActions ? `<button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${free < 1 ? 'disabled' : ''}>${free < 1 ? 'Betelt' : 'Foglalás'}</button>
+            <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>` : ''}
             ${manager ? `<button class="btn btn-secondary js-trip-edit" data-id="${trip.id}">Saját fuvar szerkesztése</button><button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Saját fuvar törlése</button>` : ''}
           `}
         </div>
@@ -664,6 +698,7 @@ const App = (() => {
     const ratingHtml = starRating(trip.sofor_atlag || trip.sofor_ertekeles || 0, trip.sofor_ertekeles_db || 0);
     const full = free <= 0;
     const manager = canManageTrip(trip);
+    const showGuestActions = !manager;
     return `
       <article class="card trip-compact" data-trip-id="${trip.id}">
         ${tripGalleryMarkup(trip, true)}
@@ -677,8 +712,8 @@ const App = (() => {
           <button class="btn btn-ghost js-map-focus" data-origin="${escapeHtml(trip.indulas)}" data-destination="${escapeHtml(trip.erkezes)}">Térkép</button>
           <a class="btn btn-ghost" target="_blank" rel="noopener" href="${buildGoogleMapsDirectionsUrl(trip.indulas, trip.erkezes)}">Google útvonal</a>
           <button class="btn btn-ghost js-share-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}'>Megosztás</button>
-          <button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${full ? 'disabled' : ''}>${full ? 'Betelt' : 'Foglalás'}</button>
-          <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>
+          ${showGuestActions ? `<button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${full ? 'disabled' : ''}>${full ? 'Betelt' : 'Foglalás'}</button>
+          <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>` : ''}
           ${manager ? `<button class="btn btn-secondary js-trip-edit" data-id="${trip.id}">Szerkesztés</button><button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Törlés</button>` : ''}
         </div>
       </article>`;
@@ -762,11 +797,21 @@ const App = (() => {
       profil_kep_url: profileUrl,
       auto_kepek: carImageUrls,
       sofor_ertekeles: 0,
-      ertekeles_db: 0
+      ertekeles_db: 0,
+      trip_url: APP_CONFIG.siteUrl + 'trip.html',
+      admin_url: APP_CONFIG.siteUrl + 'admin.html',
+      admin_login_url: APP_CONFIG.siteUrl + 'belepes.html?redirect=admin.html',
+      highlight_trip_id: ''
     };
     if (!payload.nev || !payload.indulas || !payload.erkezes) throw new Error('Tölts ki minden kötelező mezőt.');
-    const { error } = await sb.from(tableTrips).insert([payload]);
+    const { data: insertedTrip, error } = await sb.from(tableTrips).insert([payload]).select('id').single();
     if (error) throw error;
+    if (insertedTrip?.id) {
+      payload.highlight_trip_id = insertedTrip.id;
+      payload.trip_url = APP_CONFIG.siteUrl + 'trip.html?id=' + insertedTrip.id;
+      payload.admin_url = APP_CONFIG.siteUrl + 'admin.html?highlight=' + insertedTrip.id;
+      payload.admin_login_url = APP_CONFIG.siteUrl + 'belepes.html?redirect=admin.html&highlight=' + insertedTrip.id;
+    }
     const mailOk = await sendNotificationMail('uj_fuvar', payload);
     return mailOk;
   }
@@ -803,7 +848,19 @@ const App = (() => {
     };
     const { error } = await sb.from(tableBookings).insert([booking]);
     if (error) throw error;
-    const payload = { ...booking, sofor_email: trip.email, sofor_nev: trip.nev, indulas: trip.indulas, erkezes: trip.erkezes, datum: trip.datum, ido: trip.ido, fizetesi_mod_text: method === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek' };
+    const payload = {
+      ...booking,
+      sofor_email: trip.email,
+      sofor_nev: trip.nev,
+      indulas: trip.indulas,
+      erkezes: trip.erkezes,
+      datum: trip.datum,
+      ido: trip.ido,
+      fizetesi_mod_text: method === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek',
+      trip_url: APP_CONFIG.siteUrl + 'trip.html?id=' + trip.id,
+      driver_trip_url: APP_CONFIG.siteUrl + 'trip.html?id=' + trip.id,
+      driver_login_url: APP_CONFIG.siteUrl + 'belepes.html?redirect=trip.html%3Fid%3D' + encodeURIComponent(trip.id)
+    };
     const mailOk = await sendNotificationMail('uj_foglalas', payload);
     const passengerMailOk = await sendNotificationMail('utas_visszaigazolas', payload);
     return { ...booking, __mailOk: mailOk, __passengerMailOk: passengerMailOk };
@@ -1108,8 +1165,13 @@ const App = (() => {
     const { session } = await AppAuth.updateNav();
     AppAuth.bindLogout();
     AppAuth.watchAuth();
+    const authParams = new URLSearchParams(location.search);
+    const redirectTarget = authParams.get('redirect');
+    const highlight = authParams.get('highlight');
+    const resolvedRedirect = redirectTarget ? redirectTarget + (highlight ? `${redirectTarget.includes('?') ? '&' : '?'}highlight=${encodeURIComponent(highlight)}` : '') : '';
+    if (resolvedRedirect) AppAuth.setNext(resolvedRedirect);
     if (session) {
-      location.href = (await AppAuth.isAdmin()) ? 'admin.html' : 'index.html';
+      location.href = (await AppAuth.isAdmin()) ? (resolvedRedirect || AppAuth.consumeNext('admin.html')) : AppAuth.consumeNext('index.html');
       return;
     }
     const loginForm = document.getElementById('loginForm');
@@ -1127,7 +1189,7 @@ const App = (() => {
       msg.textContent = 'Belépés...';
       const { error } = await AppAuth.signIn(fd.get('email'), fd.get('password'));
       if (error) msg.textContent = error.message || 'Nem sikerült a belépés.';
-      else location.href = (await AppAuth.isAdmin()) ? 'admin.html' : AppAuth.consumeNext('index.html');
+      else location.href = (await AppAuth.isAdmin()) ? AppAuth.consumeNext('admin.html') : AppAuth.consumeNext('index.html');
     });
     registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1186,8 +1248,9 @@ const App = (() => {
         <div class="card"><div class="small-help">Új foglalások</div>${newBookings.length ? newBookings.slice(0,3).map(b => `<div style="margin-top:10px"><strong>${escapeHtml(b.nev || '')}</strong><br><span class="small-help">${escapeHtml(String(b.created_at || '').slice(0,16).replace('T',' '))}</span></div>`).join('') : '<div class="notice" style="margin-top:10px">Nincs új foglalás.</div>'}</div>
         <div class="card"><div class="small-help">Betelt fuvarok</div>${fullTrips.length ? fullTrips.slice(0,3).map(t => `<div style="margin-top:10px"><strong>${escapeHtml(t.indulas || '')} → ${escapeHtml(t.erkezes || '')}</strong></div>`).join('') : '<div class="notice" style="margin-top:10px">Nincs betelt fuvar.</div>'}</div>
         <div class="card"><div class="small-help">Lejár hamarosan</div>${expiringSoonTrips.length ? expiringSoonTrips.slice(0,3).map(t => `<div style="margin-top:10px"><strong>${escapeHtml(t.indulas || '')} → ${escapeHtml(t.erkezes || '')}</strong><br><span class="small-help">${escapeHtml(t.datum || '')} ${escapeHtml(t.ido || '')}</span></div>`).join('') : '<div class="notice" style="margin-top:10px">Nincs közelgő lejárat.</div>'}</div>`;
-      const trips = await enrichTripsWithRatings(allTrips);
+      const trips = sortTripsForAdmin(await enrichTripsWithRatings(allTrips));
       tripsWrap.innerHTML = trips.length ? trips.map(t => tripCard(t, true)).join('') : '<div class="empty-state">Még nincs beküldött fuvar.</div>';
+      applyAdminTripHighlight();
       const tripMap = Object.fromEntries(trips.map(t => [String(t.id), t]));
       bookingsWrap.innerHTML = bookings.length ? bookings.map(b => bookingCard(b, tripMap)).join('') : '<div class="empty-state">Még nincs foglalás.</div>';
       if (!APP_CONFIG.notificationFunctionUrl) bookingsWrap.insertAdjacentHTML('beforebegin', notificationNotice('booking'));
@@ -1305,8 +1368,17 @@ const App = (() => {
       if (!tripRaw) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
       const [trip] = await enrichTripsWithRatings([tripRaw]);
       const [driverReviews, tripReviews] = await Promise.all([fetchRatingsForTrip(trip.id, 'sofor'), fetchRatingsForTrip(trip.id, 'utazas')]);
+      const ownTrip = canManageTrip(trip) && !currentViewer.admin;
+      let ownBookings = [];
+      if (ownTrip) {
+        try {
+          const { data } = await sb.from(tableBookings).select('*').eq('fuvar_id', trip.id).order('created_at', { ascending: false });
+          ownBookings = data || [];
+        } catch (_) {}
+      }
       wrap.innerHTML = `
         ${tripCard(trip, false)}
+        ${ownTrip ? `<section class="card detail-extra" style="margin-top:18px"><div class="section-head"><div><span class="eyebrow">Saját foglalások</span><h2 style="margin:12px 0 0">Erre a fuvarra érkezett foglalások</h2></div></div>${ownBookings.length ? ownBookings.map(b => bookingCard(b, { [String(trip.id)]: trip })).join('') : '<div class="notice">Erre a fuvarra még nincs foglalás.</div>'}</section>` : ''}
         <section class="card detail-extra">
           <div class="section-head"><div><span class="eyebrow">Sofőr profil</span><h2 style="margin:12px 0 0">${escapeHtml(trip.nev || '')}</h2></div><a class="btn btn-secondary" href="driver.html?name=${encodeURIComponent(trip.nev || '')}&email=${encodeURIComponent(trip.email || '')}">Sofőr profil</a></div>
           <p>${starRating(trip.sofor_atlag || 0, trip.sofor_ertekeles_db || 0)}</p>
