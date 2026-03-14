@@ -316,3 +316,18 @@ code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:8px}
   overflow-wrap:anywhere;
   word-break:break-word;
 }
+
+
+/* Stable polish */
+.driver-booking-card .trip-meta span,
+.driver-booking-card .trip-contact div,
+.review-card p,
+.trip-card h3,
+.trip-compact h3{overflow-wrap:anywhere;word-break:break-word;}
+
+@media (max-width: 720px){
+  .driver-profile-card{gap:14px}
+  .driver-bookings-list .trip-actions{gap:8px}
+  .driver-bookings-list .trip-actions .btn{width:100%}
+  .trip-contact,.trip-meta{gap:8px 10px}
+}

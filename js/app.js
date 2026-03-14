@@ -43,6 +43,10 @@ const App = (() => {
     return !!d && d.getTime() < Date.now();
   }
 
+  function isTripClosed(trip) {
+    return isTripExpired(trip) || seatCounts(trip).free <= 0;
+  }
+
   function seatCounts(trip) {
     const total = Number(trip.osszes_hely ?? trip.auto_helyek ?? trip.helyek ?? 0);
     const booked = Number(trip.booked_seats ?? trip.foglalt_helyek_osszesen ?? NaN);
@@ -615,9 +619,31 @@ const App = (() => {
 
   async function fetchDriverRatingMap() {
     const { data, error } = await sb.from(viewDriverRatings).select('*');
-    if (error || !data) return {};
+    if (!error && data) {
+      const map = {};
+      for (const row of data) map[String(row.sofor_email || '').toLowerCase()] = row;
+      return map;
+    }
+
+    const [{ data: ratings }, { data: trips }] = await Promise.all([
+      sb.from(tableRatings).select('fuvar_id,csillag,tipus'),
+      sb.from(tableTrips).select('id,email')
+    ]);
+    const tripEmailMap = {};
+    (trips || []).forEach(t => { tripEmailMap[String(t.id)] = String(t.email || '').toLowerCase(); });
+    const agg = {};
+    (ratings || []).forEach(r => {
+      if (String(r.tipus || '').toLowerCase() !== 'sofor') return;
+      const email = tripEmailMap[String(r.fuvar_id)] || '';
+      if (!email) return;
+      agg[email] ||= { osszeg: 0, darab: 0 };
+      agg[email].osszeg += Number(r.csillag || 0);
+      agg[email].darab += 1;
+    });
     const map = {};
-    for (const row of data) map[String(row.sofor_email || '').toLowerCase()] = row;
+    Object.entries(agg).forEach(([email, row]) => {
+      map[email] = { sofor_email: email, atlag: row.darab ? row.osszeg / row.darab : 0, darab: row.darab };
+    });
     return map;
   }
 
@@ -694,7 +720,11 @@ const App = (() => {
       ? trip.fizetesi_modok
       : ['transfer', 'cash']).map(m => m === 'cash' ? 'Készpénz a sofőrnek' : 'Utalás a sofőrnek').join(' · ');
     const ratingHtml = starRating(trip.sofor_atlag || trip.sofor_ertekeles || 0, trip.sofor_ertekeles_db || 0);
-    const fullBadge = free <= 0 ? '<span class="status rejected">Betelt</span><span class="status info">Már nem foglalható</span>' : '';
+    const expired = isTripExpired(trip);
+    const closed = expired || free <= 0;
+    const fullBadge = expired
+      ? '<span class="status rejected">Lejárt</span><span class="status info">Már nem foglalható</span>'
+      : free <= 0 ? '<span class="status rejected">Betelt</span><span class="status info">Már nem foglalható</span>' : '';
     const ownTrip = !admin && isOwnTrip(trip);
     const manager = !admin && ownerCanEditOrDeleteTrip(trip);
     const ownTripNotice = ownTrip
@@ -749,7 +779,7 @@ const App = (() => {
           ` : `
             <div class="notice">Ez a saját fuvarod. Foglalásokat lent tudod kezelni.</div>
           `) : `
-            <button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${free < 1 ? 'disabled' : ''}>${free < 1 ? 'Betelt' : 'Foglalás'}</button>
+            <button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${closed ? 'disabled' : ''}>${expired ? 'Lejárt' : free < 1 ? 'Betelt' : 'Foglalás'}</button>
             <a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>
           `}
         </div>
@@ -760,14 +790,15 @@ const App = (() => {
   function tripListCard(trip) {
     const { total, free } = seatCounts(trip);
     const ratingHtml = starRating(trip.sofor_atlag || trip.sofor_ertekeles || 0, trip.sofor_ertekeles_db || 0);
-    const full = free <= 0;
+    const expired = isTripExpired(trip);
+    const full = expired || free <= 0;
     const ownTrip = isOwnTrip(trip);
     const manager = ownerCanEditOrDeleteTrip(trip);
     const isAdmin = !!currentViewer.admin;
     return `
       <article class="card trip-compact" data-trip-id="${trip.id}">
         ${tripGalleryMarkup(trip, true)}
-        <div class="inline-pills"><span class="pill">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</span>${statusBadge(trip.statusz || 'Jóváhagyva')} ${full ? '<span class="status rejected">Betelt</span><span class="status info">Már nem foglalható</span>' : ''}</div>
+        <div class="inline-pills"><span class="pill">${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</span>${statusBadge(trip.statusz || 'Jóváhagyva')} ${full ? (expired ? '<span class="status rejected">Lejárt</span><span class="status info">Már nem foglalható</span>' : '<span class="status rejected">Betelt</span><span class="status info">Már nem foglalható</span>') : ''}</div>
         <h3>${escapeHtml(trip.indulas)} → ${escapeHtml(trip.erkezes)}</h3>
         <p class="trip-compact-meta">${escapeHtml(trip.datum || '')} • ${escapeHtml(trip.ido || '')} • ${fmtCurrency(trip.ar)} Ft / fő</p>
         ${driverMiniMarkup(trip, ratingHtml)}
@@ -778,7 +809,7 @@ const App = (() => {
           <button class="btn btn-ghost js-map-focus" data-origin="${escapeHtml(trip.indulas)}" data-destination="${escapeHtml(trip.erkezes)}">Térkép</button>
           <a class="btn btn-ghost" target="_blank" rel="noopener" href="${buildGoogleMapsDirectionsUrl(trip.indulas, trip.erkezes)}">Google útvonal</a>
           <button class="btn btn-ghost js-share-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}'>Megosztás</button>
-          ${isAdmin ? `<button class="btn btn-secondary js-trip-edit" data-id="${trip.id}">Admin szerkesztés</button><button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Admin törlés</button>` : ownTrip ? (manager ? `<button class="btn btn-secondary js-trip-edit" data-id="${trip.id}">Szerkesztés</button><button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Törlés</button>` : `<div class="notice">Ez a saját fuvarod.</div>`) : `<button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${full ? 'disabled' : ''}>${full ? 'Betelt' : 'Foglalás'}</button><a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>`}
+          ${isAdmin ? `<button class="btn btn-secondary js-trip-edit" data-id="${trip.id}">Admin szerkesztés</button><button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Admin törlés</button>` : ownTrip ? (manager ? `<button class="btn btn-secondary js-trip-edit" data-id="${trip.id}">Szerkesztés</button><button class="btn btn-danger js-trip-delete" data-id="${trip.id}">Törlés</button>` : `<div class="notice">Ez a saját fuvarod.</div>`) : `<button class="btn btn-primary js-book-trip" data-trip='${encodeURIComponent(JSON.stringify(trip))}' ${full ? 'disabled' : ''}>${expired ? 'Lejárt' : full ? 'Betelt' : 'Foglalás'}</button><a class="btn btn-secondary" href="kapcsolat.html?tripId=${trip.id}&driverName=${encodeURIComponent(trip.nev || '')}&driverEmail=${encodeURIComponent(trip.email || '')}">Kérdés a sofőrnek</a>`}
         </div>
       </article>`;
   }
@@ -984,6 +1015,14 @@ const App = (() => {
         const sameUser = !!(user?.id && trip?.user_id && String(user.id) === String(trip.user_id));
         if (sameEmail || sameUser) {
           alert('A saját fuvarodra nem foglalhatsz.');
+          return;
+        }
+        if (isTripExpired(trip)) {
+          alert('Ez a fuvar már lejárt, ezért nem foglalható.');
+          return;
+        }
+        if (seatCounts(trip).free < 1) {
+          alert('Ez a fuvar már betelt.');
           return;
         }
         const existingBooking = await fetchPassengerBookingForTrip(trip.id, userEmail);
@@ -1535,6 +1574,7 @@ const App = (() => {
       if (!tripRaw) { wrap.innerHTML = '<div class="empty-state">A fuvar nem található.</div>'; return; }
       [trip] = await enrichTripsWithRatings(await enrichTripsWithBookings([tripRaw]));
       isManagerView = !!(currentViewer.admin || isOwnTrip(trip));
+      if (isTripExpired(trip) && !isManagerView) { wrap.innerHTML = '<div class="empty-state">Ez a fuvar már lejárt.</div>'; return; }
       [driverReviews, tripReviews, tripBookings] = await Promise.all([
         fetchRatingsForTrip(trip.id, 'sofor'),
         fetchRatingsForTrip(trip.id, 'utazas'),
