@@ -2,6 +2,9 @@ window.AppAuth = (() => {
   let cachedAdminEmail = null;
   const ADMIN_CACHE_KEY = 'fv_admin_email_cache';
 
+  const ONESIGNAL_APP_ID = '04a02749-13bd-4060-9559-f0808ee9f927';
+  let oneSignalBootPromise = null;
+
   function setNext(url) {
     try { sessionStorage.setItem('uv_next', url || 'index.html'); } catch(_) {}
   }
@@ -80,6 +83,65 @@ window.AppAuth = (() => {
     }, 2200);
   }
 
+  function ensureOneSignalSdk() {
+    if (!ONESIGNAL_APP_ID) return Promise.resolve(null);
+    if (oneSignalBootPromise) return oneSignalBootPromise;
+
+    oneSignalBootPromise = new Promise((resolve) => {
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+      const afterLoad = () => {
+        window.OneSignalDeferred.push(async function(OneSignal) {
+          try {
+            await OneSignal.init({
+              appId: ONESIGNAL_APP_ID,
+            });
+            resolve(OneSignal);
+          } catch (err) {
+            console.warn('OneSignal init hiba:', err);
+            resolve(null);
+          }
+        });
+      };
+
+      const existing = document.querySelector('script[data-onesignal-sdk="1"]');
+      if (existing) {
+        afterLoad();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+      script.defer = true;
+      script.dataset.onesignalSdk = '1';
+      script.onload = afterLoad;
+      script.onerror = () => {
+        console.warn('OneSignal SDK nem töltődött be.');
+        resolve(null);
+      };
+      document.head.appendChild(script);
+    });
+
+    return oneSignalBootPromise;
+  }
+
+  async function syncOneSignalUser(user) {
+    if (!ONESIGNAL_APP_ID) return;
+    try {
+      const OneSignal = await ensureOneSignalSdk();
+      if (!OneSignal) return;
+
+      const email = String(user?.email || '').trim().toLowerCase();
+      if (email) {
+        await OneSignal.login(email);
+      } else {
+        await OneSignal.logout();
+      }
+    } catch (err) {
+      console.warn('OneSignal felhasználó-szinkron hiba:', err);
+    }
+  }
+
   async function updateNav() {
     const session = await getSession();
     const user = session?.user || null;
@@ -108,6 +170,8 @@ window.AppAuth = (() => {
         el.classList.remove('hidden');
       }
     });
+
+    await syncOneSignalUser(user);
     return { session, user, admin };
   }
 
@@ -142,6 +206,10 @@ window.AppAuth = (() => {
   }
 
   async function logout() {
+    try {
+      await syncOneSignalUser(null);
+    } catch (_) {}
+
     try { await sb.auth.signOut(); } catch (err) { console.error('Kilépési hiba:', err); }
     try {
       sessionStorage.removeItem('uv_next');
@@ -250,7 +318,8 @@ window.AppAuth = (() => {
     watchAuth,
     setNext,
     consumeNext,
-    showLogoutMessageIfNeeded
+    showLogoutMessageIfNeeded,
+    syncOneSignalUser
   };
 })();
 
