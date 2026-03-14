@@ -130,56 +130,161 @@ window.AppAuth = (() => {
     return oneSignalBootPromise;
   }
 
+  function detectPushState() {
+    const ua = navigator.userAgent || '';
+    const browser = /Edg\//.test(ua) ? 'edge' : /Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'chrome' : /Safari\//.test(ua) && !/Chrome\//.test(ua) ? 'safari' : 'other';
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+    const hasNotificationApi = typeof window !== 'undefined' && 'Notification' in window;
+    const hasServiceWorker = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
+    const permission = hasNotificationApi ? Notification.permission : 'unsupported';
+
+    let mode = 'promptable';
+    if (!hasNotificationApi || !hasServiceWorker) mode = 'unsupported';
+    else if (isIOS && !isStandalone) mode = 'ios_needs_pwa';
+    else if (permission === 'granted') mode = 'granted';
+    else if (permission === 'denied') mode = 'denied';
+
+    return { browser, isIOS, isStandalone, hasNotificationApi, hasServiceWorker, permission, mode };
+  }
+
+  function getPushBarContent(state) {
+    if (state.mode === 'unsupported') {
+      return {
+        title: 'A push értesítések ezen az eszközön vagy böngészőben most nem támogatottak.',
+        btn: 'Mit kell tenni?',
+        help: 'Próbáld Chrome vagy Edge böngészőben, HTTPS alatt. Mobilon szükség van értesítést támogató böngészőre és engedélyezett service workerre.'
+      };
+    }
+    if (state.mode === 'ios_needs_pwa') {
+      return {
+        title: 'iPhone-on a push értesítésekhez tedd ki az oldalt a kezdőképernyőre.',
+        btn: 'iPhone beállítások',
+        help: 'Safari → Megosztás → Főképernyőhöz adás. Ezután a kezdőképernyőről nyisd meg a FuvarVelünk oldalt, és ott engedélyezd az értesítéseket.'
+      };
+    }
+    if (state.mode === 'denied') {
+      const browserLabel = state.browser === 'edge' ? 'Edge' : state.browser === 'chrome' ? 'Chrome' : 'böngésző';
+      return {
+        title: 'A push értesítések jelenleg le vannak tiltva ebben a böngészőben.',
+        btn: 'Mutasd a lépéseket',
+        help: `${browserLabel}: kattints a lakat ikonra a címsorban → Webhelyengedélyek / Site permissions → Értesítések → Engedélyezés. Ha tiltólistán van az oldal, töröld a tiltást, majd frissítsd az oldalt.`
+      };
+    }
+    return {
+      title: 'Kapcsold be a push értesítéseket, hogy azonnal lásd a foglalásokat, jóváhagyásokat és fizetéseket.',
+      btn: 'Push értesítések bekapcsolása',
+      help: 'Ha nem ugrik fel engedélykérés, valószínűleg a böngésző korábban letiltotta. Ebben az esetben a webhely engedélyeinél kell visszakapcsolni az értesítéseket.'
+    };
+  }
+
+  function renderPushBar(state) {
+    const content = getPushBarContent(state);
+    let bar = document.getElementById('pushEnableBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'pushEnableBar';
+      bar.className = 'push-enable-bar';
+      bar.innerHTML = `
+        <div class="push-enable-main">
+          <div class="push-enable-text"></div>
+          <div class="push-enable-help hidden"></div>
+        </div>
+        <div class="push-enable-actions">
+          <button type="button" class="btn btn-primary push-enable-btn"></button>
+          <button type="button" class="btn push-enable-close">Bezárás</button>
+        </div>
+      `;
+      document.body.appendChild(bar);
+    }
+
+    bar.dataset.mode = state.mode;
+    const text = bar.querySelector('.push-enable-text');
+    const help = bar.querySelector('.push-enable-help');
+    const btn = bar.querySelector('.push-enable-btn');
+    const closeBtn = bar.querySelector('.push-enable-close');
+
+    if (text) text.textContent = content.title;
+    if (help) {
+      help.textContent = content.help;
+      help.classList.add('hidden');
+    }
+    if (btn) {
+      btn.textContent = content.btn;
+      btn.disabled = false;
+    }
+
+    if (closeBtn && !closeBtn.dataset.bound) {
+      closeBtn.dataset.bound = '1';
+      closeBtn.addEventListener('click', () => {
+        try { sessionStorage.setItem(ONESIGNAL_PROMPT_KEY, 'dismissed'); } catch (_) {}
+        bar.remove();
+      });
+    }
+
+    return bar;
+  }
+
   async function ensurePushPromptButton(OneSignal, email) {
     try {
-      const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-      if (permission === 'granted') {
+      const state = detectPushState();
+      if (state.mode === 'granted') {
         const old = document.getElementById('pushEnableBar');
         if (old) old.remove();
+        try { sessionStorage.removeItem(ONESIGNAL_PROMPT_KEY); } catch (_) {}
         return;
       }
 
-      let bar = document.getElementById('pushEnableBar');
-      if (!bar) {
-        bar = document.createElement('div');
-        bar.id = 'pushEnableBar';
-        bar.className = 'push-enable-bar';
-        bar.innerHTML = `
-          <div class="push-enable-text">Kapcsold be a push értesítéseket, hogy azonnal lásd a foglalásokat és jóváhagyásokat.</div>
-          <button type="button" class="btn btn-primary push-enable-btn">Push értesítések bekapcsolása</button>
-        `;
-        document.body.appendChild(bar);
-      }
+      const dismissed = (() => {
+        try { return sessionStorage.getItem(ONESIGNAL_PROMPT_KEY) === 'dismissed'; } catch (_) { return false; }
+      })();
+      if (dismissed && state.mode !== 'denied') return;
 
+      const bar = renderPushBar(state);
       const btn = bar.querySelector('.push-enable-btn');
+      const help = bar.querySelector('.push-enable-help');
+
       if (btn && !btn.dataset.bound) {
         btn.dataset.bound = '1';
         btn.addEventListener('click', async () => {
+          const currentState = detectPushState();
+          bar.dataset.mode = currentState.mode;
+
+          if (currentState.mode === 'unsupported' || currentState.mode === 'ios_needs_pwa' || currentState.mode === 'denied') {
+            help?.classList.toggle('hidden');
+            if (currentState.mode === 'denied') showToast('A böngészőben kell újra engedélyezni az értesítéseket.');
+            return;
+          }
+
           try {
             btn.disabled = true;
             btn.textContent = 'Engedélykérés...';
             if (OneSignal.Notifications?.requestPermission) {
               await OneSignal.Notifications.requestPermission();
             }
-            const current = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-            if (current === 'granted') {
+            const latest = detectPushState();
+            if (latest.mode === 'granted') {
               try {
                 await OneSignal.login(email);
                 if (OneSignal.User?.addTag) {
                   await OneSignal.User.addTag('email', email);
                 }
               } catch (_) {}
+              try { sessionStorage.removeItem(ONESIGNAL_PROMPT_KEY); } catch (_) {}
               bar.remove();
               showToast('Push értesítések engedélyezve.');
             } else {
-              btn.disabled = false;
-              btn.textContent = 'Push értesítések bekapcsolása';
-              showToast('Az értesítések még nincsenek engedélyezve.');
+              const refreshed = renderPushBar(latest);
+              const refreshedHelp = refreshed.querySelector('.push-enable-help');
+              if (latest.mode === 'denied') refreshedHelp?.classList.remove('hidden');
+              showToast(latest.mode === 'denied'
+                ? 'A böngésző letiltotta az értesítéseket. A webhely engedélyeinél kapcsold vissza.'
+                : 'Az értesítések még nincsenek engedélyezve.');
             }
           } catch (err) {
             console.warn('Push gomb hiba:', err);
-            btn.disabled = false;
-            btn.textContent = 'Push értesítések bekapcsolása';
+            const refreshed = renderPushBar(detectPushState());
+            refreshed.querySelector('.push-enable-help')?.classList.remove('hidden');
           }
         });
       }

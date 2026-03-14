@@ -1,0 +1,12 @@
+FuvarVelunk stabil push javítások
+
+- A push sáv most már felismeri az alábbi állapotokat:
+  - engedélyezve
+  - tiltva a böngészőben
+  - nem támogatott
+  - iPhone / iOS: csak PWA-ból engedélyezhető
+- Ha a böngésző korábban letiltotta az értesítést, a gomb már nem tesz úgy,
+  mintha újra kérne engedélyt, hanem lépésről lépésre kiírja mit kell tenni.
+- Ha már engedélyezve van a push, a sáv eltűnik.
+- Van külön Bezárás gomb is, hogy ne legyen zavaró.
+- Mobilon a push sáv jobban törik és olvashatóbb.
